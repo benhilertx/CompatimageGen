@@ -15,7 +15,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sharp": "^0.34.3",
-    "svgo": "^4.0.0"
+    "svgo": "^4.0.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^19",
     "@types/sharp": "^0.31.1",
     "@types/svgo": "^2.6.4",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.4.2",
     "tailwindcss": "^4",
