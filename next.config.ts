@@ -1,7 +1,54 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Enable image optimization for previews
+  images: {
+    domains: [],
+    formats: ['image/avif', 'image/webp'],
+  },
+  
+  // Configure webpack to handle SVG and other file types
+  webpack(config) {
+    // SVG handling
+    config.module.rules.push({
+      test: /\.svg$/,
+      use: ['@svgr/webpack'],
+    });
+    
+    return config;
+  },
+  
+  // API configuration
+  api: {
+    // Increase body size limit for file uploads (1MB)
+    bodyParser: {
+      sizeLimit: '1mb',
+    },
+    responseLimit: '4mb',
+  },
+  
+  // Security headers
+  headers: async () => {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
