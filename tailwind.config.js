@@ -75,7 +75,20 @@ module.exports = {
       maxWidth: {
         'email': '600px', // Standard email width
       },
+      spacing: {
+        '18': '4.5rem',
+        '22': '5.5rem',
+      },
+      fontSize: {
+        'xxs': '0.625rem', // 10px
+      },
+      touchAction: {
+        'manipulation': 'manipulation',
+      },
     },
   },
   plugins: [],
+  corePlugins: {
+    touchAction: true,
+  },
 }

@@ -61,9 +61,9 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
 
   return (
     <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-semibold mb-2">Email Client Previews</h2>
-        <p className="text-gray-600 mb-4">
+      <div className="p-4 sm:p-6 border-b border-gray-200">
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">Email Client Previews</h2>
+        <p className="text-sm sm:text-base text-gray-600 mb-4">
           See how your logo will appear in different email clients
         </p>
 
@@ -71,11 +71,12 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
         <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setSelectedClient('all')}
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
+            className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium touch-manipulation ${
               selectedClient === 'all'
                 ? 'bg-primary-100 text-primary-800 border border-primary-300'
-                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 active:bg-gray-300'
             }`}
+            aria-pressed={selectedClient === 'all'}
           >
             All Clients
           </button>
@@ -87,11 +88,12 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
             <button
               key={client.id}
               onClick={() => setSelectedClient(client.id)}
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
+              className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium touch-manipulation ${
                 selectedClient === client.id
                   ? 'bg-primary-100 text-primary-800 border border-primary-300'
-                  : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 active:bg-gray-300'
               }`}
+              aria-pressed={selectedClient === client.id}
             >
               {client.name}
             </button>
@@ -102,31 +104,34 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
         <div className="mb-4">
           <button
             onClick={() => setShowCode(!showCode)}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md border border-gray-300 transition-colors flex items-center"
+            className="px-3 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-800 rounded-md border border-gray-300 transition-colors flex items-center touch-manipulation"
+            aria-expanded={showCode}
+            aria-controls="html-code-section"
           >
-            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
-            {showCode ? 'Hide HTML Code' : 'Show HTML Code'}
+            <span className="text-sm">{showCode ? 'Hide HTML Code' : 'Show HTML Code'}</span>
           </button>
         </div>
 
         {/* HTML Code */}
         {showCode && (
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
+          <div id="html-code-section" className="mb-4 sm:mb-6">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
               <h3 className="text-sm font-semibold text-gray-700">HTML Code</h3>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(htmlCode);
                   // You could add a toast notification here
                 }}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300"
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded border border-gray-300 touch-manipulation"
+                aria-label="Copy HTML code to clipboard"
               >
                 Copy to Clipboard
               </button>
             </div>
-            <div className="bg-gray-50 rounded-md border border-gray-200 p-4 overflow-x-auto">
+            <div className="bg-gray-50 rounded-md border border-gray-200 p-3 sm:p-4 overflow-x-auto">
               <pre className="text-xs text-gray-800 whitespace-pre-wrap">
                 {htmlCode}
               </pre>
@@ -136,37 +141,38 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
       </div>
 
       {/* Preview cards */}
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {filteredPreviews.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             No previews available for the selected client
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredPreviews.map((preview, index) => {
               const quality = getQualityDisplay(preview.estimatedQuality);
               
               return (
                 <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
                   {/* Client header */}
-                  <div className="bg-gray-50 p-4 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium">{getClientName(preview.client)}</h3>
-                      <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                  <div className="bg-gray-50 p-3 sm:p-4 border-b border-gray-200">
+                    <div className="flex flex-wrap justify-between items-center gap-2">
+                      <h3 className="font-medium text-sm sm:text-base">{getClientName(preview.client)}</h3>
+                      <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full whitespace-nowrap">
                         {getMarketShare(preview.client)}% market share
                       </span>
                     </div>
                   </div>
                   
                   {/* Preview content */}
-                  <div className="p-4">
+                  <div className="p-3 sm:p-4">
                     {/* If we have a preview image (base64 string) */}
                     {preview.previewImage && (
-                      <div className="mb-4 flex justify-center bg-white border border-gray-100 rounded p-2">
+                      <div className="mb-3 sm:mb-4 flex justify-center bg-white border border-gray-100 rounded p-2">
                         <img 
                           src={`data:image/png;base64,${preview.previewImage.toString('base64')}`}
                           alt={`${getClientName(preview.client)} preview`}
                           className="max-w-full h-auto"
+                          loading="lazy"
                         />
                       </div>
                     )}
@@ -174,17 +180,17 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
                     {/* Fallback info */}
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Fallback Used:</span>
-                        <span className="text-sm font-medium">{getFallbackTypeName(preview.fallbackUsed)}</span>
+                        <span className="text-xs sm:text-sm text-gray-600">Fallback Used:</span>
+                        <span className="text-xs sm:text-sm font-medium">{getFallbackTypeName(preview.fallbackUsed)}</span>
                       </div>
                       
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Rendering Quality:</span>
-                        <span className={`text-sm font-medium ${quality.color}`}>{quality.text}</span>
+                        <span className="text-xs sm:text-sm text-gray-600">Rendering Quality:</span>
+                        <span className={`text-xs sm:text-sm font-medium ${quality.color}`}>{quality.text}</span>
                       </div>
                       
                       {/* Client-specific notes */}
-                      <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100">
                         <h4 className="text-xs font-medium text-gray-700 mb-1">Notes:</h4>
                         <ul className="text-xs text-gray-600 list-disc list-inside">
                           {preview.fallbackUsed === 'svg' && (

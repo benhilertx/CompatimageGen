@@ -97,10 +97,10 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-4 md:p-24">
+    <main className="flex min-h-screen flex-col items-center justify-between p-3 sm:p-4 md:p-8 lg:p-16">
       <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
-        <h1 className="text-4xl font-bold mb-8 text-center">CompatimageGen</h1>
-        <p className="text-xl mb-8 text-center">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8 text-center">CompatimageGen</h1>
+        <p className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 md:mb-8 text-center">
           Generate email-compatible logo HTML with fallbacks for all major email clients
         </p>
         
@@ -115,19 +115,19 @@ export default function Home() {
         
         {/* Upload success message - Show only if upload succeeded but processing hasn't started */}
         {uploadSuccess && !processId && (
-          <div className="mt-6 p-4 bg-success-50 border border-success-100 text-success-700 rounded-md">
+          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-success-50 border border-success-100 text-success-700 rounded-md">
             <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2 text-success-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0 text-success-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <p>File uploaded successfully! Processing will begin shortly.</p>
+              <p className="text-sm sm:text-base">File uploaded successfully! Processing will begin shortly.</p>
             </div>
           </div>
         )}
         
         {/* Processing Status Component - Show only when processing */}
         {processId && !processingComplete && !processingError && (
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-6">
             <ProcessingStatusComponent 
               processId={processId}
               onComplete={handleProcessingComplete}
@@ -138,14 +138,14 @@ export default function Home() {
         
         {/* Preview Component - Show when processing is complete */}
         {processingComplete && previewData && (
-          <div className="mt-6 space-y-6">
+          <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
             {/* Success message */}
-            <div className="p-4 bg-success-50 border border-success-100 text-success-700 rounded-md">
+            <div className="p-3 sm:p-4 bg-success-50 border border-success-100 text-success-700 rounded-md">
               <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2 text-success-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0 text-success-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <p>Processing complete! Your files are ready for download.</p>
+                <p className="text-sm sm:text-base">Processing complete! Your files are ready for download.</p>
               </div>
             </div>
             
@@ -162,12 +162,12 @@ export default function Home() {
             />
             
             {/* Text previews */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold mb-4">Email Client Compatibility</h3>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Email Client Compatibility</h3>
               <div className="space-y-2">
                 {previewData.textPreviews.map((text, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-md border border-gray-200">
-                    <p className="text-gray-700">{text}</p>
+                  <div key={index} className="p-2 sm:p-3 bg-gray-50 rounded-md border border-gray-200">
+                    <p className="text-sm text-gray-700">{text}</p>
                   </div>
                 ))}
               </div>
@@ -176,7 +176,7 @@ export default function Home() {
             {/* Process another file button */}
             <div className="flex justify-center">
               <button 
-                className="px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors touch-manipulation"
                 onClick={() => {
                   // Reset state to allow new uploads
                   setProcessId(null);
@@ -184,6 +184,7 @@ export default function Home() {
                   setFileId(null);
                   setUploadSuccess(false);
                 }}
+                aria-label="Process another file"
               >
                 Process Another File
               </button>
@@ -193,25 +194,25 @@ export default function Home() {
         
         {/* Loading previews message */}
         {processingComplete && isLoadingPreviews && (
-          <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-              <span className="ml-3 text-gray-700">Loading previews...</span>
+              <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary-500" aria-hidden="true"></div>
+              <span className="ml-3 text-sm sm:text-base text-gray-700">Loading previews...</span>
             </div>
           </div>
         )}
         
         {/* Preview error message */}
         {processingComplete && previewError && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-red-50 border border-red-200 text-red-700 rounded-md" role="alert">
             <div className="flex items-start">
-              <svg className="w-5 h-5 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <p>Failed to load previews: {previewError}</p>
+              <p className="text-sm">Failed to load previews: {previewError}</p>
             </div>
             <button 
-              className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              className="mt-3 sm:mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors touch-manipulation"
               onClick={() => {
                 // Reset state to allow new uploads
                 setProcessId(null);
@@ -219,6 +220,7 @@ export default function Home() {
                 setFileId(null);
                 setUploadSuccess(false);
               }}
+              aria-label="Process another file"
             >
               Process Another File
             </button>
@@ -227,15 +229,15 @@ export default function Home() {
         
         {/* Processing error message */}
         {processingError && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-red-50 border border-red-200 text-red-700 rounded-md" role="alert">
             <div className="flex items-start">
-              <svg className="w-5 h-5 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <p>Processing failed. Please try again with a different file.</p>
+              <p className="text-sm">Processing failed. Please try again with a different file.</p>
             </div>
             <button 
-              className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              className="mt-3 sm:mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors touch-manipulation"
               onClick={() => {
                 // Reset state to allow new uploads
                 setProcessId(null);
@@ -244,6 +246,7 @@ export default function Home() {
                 setFileId(null);
                 setUploadSuccess(false);
               }}
+              aria-label="Try again"
             >
               Try Again
             </button>
@@ -252,24 +255,24 @@ export default function Home() {
         
         {/* Features section - Show only when not processing */}
         {!processId && (
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-2">Universal Compatibility</h3>
-              <p className="text-gray-600">
+          <div className="mt-8 sm:mt-12 md:mt-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+            <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Universal Compatibility</h3>
+              <p className="text-sm sm:text-base text-gray-600">
                 Works across all major email clients including Gmail, Outlook, and Apple Mail
               </p>
             </div>
             
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-2">No Hosting Required</h3>
-              <p className="text-gray-600">
+            <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-2">No Hosting Required</h3>
+              <p className="text-sm sm:text-base text-gray-600">
                 All assets are embedded as inline data URIs or included in the download package
               </p>
             </div>
             
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-2">Multiple Format Support</h3>
-              <p className="text-gray-600">
+            <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Multiple Format Support</h3>
+              <p className="text-sm sm:text-base text-gray-600">
                 Upload SVG, PNG, JPEG, or CSS logos and get optimized outputs with fallbacks
               </p>
             </div>
