@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ProcessingStatus, Warning } from '@/types';
+import { ProcessingStatusInfo, Warning } from '@/types';
 
 interface ProcessingStatusComponentProps {
   processId: string;
@@ -14,13 +14,13 @@ const ProcessingStatusComponent: React.FC<ProcessingStatusComponentProps> = ({
   onComplete,
   pollingInterval = 1000, // Default to 1 second
 }) => {
-  const [status, setStatus] = useState<ProcessingStatus | null>(null);
+  const [status, setStatus] = useState<ProcessingStatusInfo | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(true);
 
   // Define step labels for user-friendly display
-  const stepLabels: Record<ProcessingStatus['step'], string> = {
+  const stepLabels: Record<ProcessingStatusInfo['step'], string> = {
     'validating': 'Validating File',
     'optimizing': 'Optimizing File',
     'generating-fallbacks': 'Generating Fallbacks',
@@ -31,7 +31,7 @@ const ProcessingStatusComponent: React.FC<ProcessingStatusComponentProps> = ({
   };
 
   // Define step order for progress tracking
-  const stepOrder: ProcessingStatus['step'][] = [
+  const stepOrder: ProcessingStatusInfo['step'][] = [
     'validating',
     'optimizing',
     'generating-fallbacks',

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ProcessingStatus, Warning } from '@/types';
+import { ProcessingStatusInfo, Warning } from '@/types';
 
 interface UseProcessingStatusProps {
   processId: string | null;
@@ -8,7 +8,7 @@ interface UseProcessingStatusProps {
 }
 
 interface UseProcessingStatusResult {
-  status: ProcessingStatus | null;
+  status: ProcessingStatusInfo | null;
   warnings: Warning[];
   error: string | null;
   isPolling: boolean;
@@ -26,7 +26,7 @@ export function useProcessingStatus({
   pollingInterval = 1000,
   autoStart = true
 }: UseProcessingStatusProps): UseProcessingStatusResult {
-  const [status, setStatus] = useState<ProcessingStatus | null>(null);
+  const [status, setStatus] = useState<ProcessingStatusInfo | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(autoStart);

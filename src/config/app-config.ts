@@ -19,6 +19,13 @@ export const APP_CONFIG = {
     validateFileStructure: true
   },
   
+  // Process results storage
+  process: {
+    tempDir: process.env.TEMP_PROCESS_DIR || '', // Will default to os.tmpdir()/compatimage-results if empty
+    tempFileExpiry: 3600000, // 1 hour in milliseconds
+    cleanupInterval: 3600000, // 1 hour in milliseconds
+  },
+  
   // Processing options
   processing: {
     // SVG optimization options for SVGO

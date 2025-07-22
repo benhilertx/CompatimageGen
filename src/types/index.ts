@@ -48,8 +48,11 @@ export interface Warning {
   severity: 'low' | 'medium' | 'high';
 }
 
+// Processing status type
+export type ProcessingStatus = 'pending' | 'processing' | 'complete' | 'error';
+
 // Processing status information
-export interface ProcessingStatus {
+export interface ProcessingStatusInfo {
   step: 'validating' | 'optimizing' | 'generating-fallbacks' | 'creating-html' | 'packaging' | 'complete' | 'error';
   progress: number; // 0-100
   message: string;

@@ -68,13 +68,41 @@ export default function Home() {
       setFileId(data.fileId);
       setUploadSuccess(true);
 
-      // Simulate starting a processing job
-      // In a real implementation, you would call an API to start processing
-      // and get back a processId
-      setTimeout(() => {
-        // This is a mock process ID - in a real app, this would come from the API
-        setProcessId('test-process-id');
-      }, 1000);
+      // Start processing the file
+      try {
+        // Call the process API with the file ID
+        const processResponse = await fetch('/api/process', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileId: data.fileId,
+            options: {
+              altText: file.name.split('.')[0] || 'Logo',
+              dimensions: { width: 200, height: 200 },
+              optimizationLevel: 'medium',
+              generatePreviews: true
+            }
+          }),
+        });
+
+        if (!processResponse.ok) {
+          const processErrorData = await processResponse.json();
+          throw new Error(processErrorData.error || 'Processing failed');
+        }
+
+        const processData = await processResponse.json();
+        setProcessId(processData.processId);
+        
+        // If processing is already complete, update state
+        if (processData.status === 'complete') {
+          setProcessingComplete(true);
+        }
+      } catch (processError) {
+        console.error('Processing error:', processError);
+        setProcessingError(true);
+      }
 
       // Reset upload state after a delay
       setTimeout(() => {
@@ -86,7 +114,6 @@ export default function Home() {
       console.error('Upload error:', error);
       setIsUploading(false);
       setProcessingError(true);
-      // Error handling would be implemented here
     }
   };
 

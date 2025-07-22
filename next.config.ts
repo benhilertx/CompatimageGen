@@ -18,15 +18,6 @@ const nextConfig: NextConfig = {
     return config;
   },
   
-  // API configuration
-  api: {
-    // Increase body size limit for file uploads (1MB)
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
-    responseLimit: '4mb',
-  },
-  
   // Security headers
   headers: async () => {
     return [

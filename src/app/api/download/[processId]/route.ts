@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PackageGeneratorService } from '@/lib/services/package-generator-service';
-import APP_CONFIG from '@/config/app-config';
-import { ClientPreview, PackageData, ProcessingResult } from '@/types';
-import { PreviewGeneratorService } from '@/lib/services/preview-generator-service';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
+import JSZip from 'jszip';
+import { APP_CONFIG } from '@/config/app-config';
+
+// Configure API route options
+export const config = {
+  api: {
+    // Set response limit to 10MB for larger downloads
+    responseLimit: '10mb',
+  },
+};
 
 /**
- * API endpoint for downloading a ZIP package with all generated files
- * @param request Next.js request
- * @param params Route parameters containing processId
- * @returns Response with ZIP file or error
+ * API route for downloading processed files
  */
 export async function GET(
   request: NextRequest,
@@ -17,93 +23,251 @@ export async function GET(
   try {
     const { processId } = params;
     
-    // In a real implementation, you would fetch the processing result from a database or cache
-    // For this example, we'll simulate a processing result
-    const processingResult = await fetchProcessingResult(processId);
-    
-    if (!processingResult) {
+    if (!processId) {
       return NextResponse.json(
-        { error: 'Processing result not found' },
-        { status: 404 }
+        { 
+          error: 'Missing processId',
+          code: 'missing-processid'
+        },
+        { status: 400 }
       );
     }
     
-    // Generate client previews if they don't exist
-    let previews: ClientPreview[] = [];
     try {
-      previews = await PreviewGeneratorService.generateClientPreviews(processingResult);
+      // Check if processing is complete
+      const statusData = await getProcessingStatus(processId);
+      
+      if (statusData.status !== 'complete') {
+        return NextResponse.json(
+          { 
+            error: 'Processing not complete',
+            code: 'processing-incomplete',
+            status: statusData.status
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Get metadata
+      const metadata = await getMetadata(processId);
+      
+      // Create ZIP package
+      const zipBuffer = await createZipPackage(processId, metadata);
+      
+      // Return ZIP file
+      return new NextResponse(zipBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="email-logo-package.zip"`,
+        },
+      });
     } catch (error) {
-      console.error('Error generating previews:', error);
-      // Continue with empty previews if generation fails
+      console.error('Download error:', error);
+      
+      // Check if file not found
+      if (error instanceof Error && error.message.includes('ENOENT')) {
+        return NextResponse.json(
+          { 
+            error: 'Process not found',
+            code: 'process-not-found',
+            details: error.message
+          },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json(
+        { 
+          error: 'Failed to generate download package',
+          code: 'download-generation-failed',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
+        { status: 500 }
+      );
     }
-    
-    // Create package data
-    const packageData: PackageData = {
-      htmlSnippet: processingResult.htmlSnippet,
-      pngFile: processingResult.pngFallback,
-      instructions: PackageGeneratorService.generateDefaultInstructions(),
-      previews,
-      metadata: processingResult.metadata
-    };
-    
-    // Generate ZIP package
-    const zipBuffer = await PackageGeneratorService.generatePackage(packageData);
-    
-    // Set headers for file download
-    const headers = new Headers();
-    headers.set('Content-Type', 'application/zip');
-    headers.set('Content-Disposition', `attachment; filename="${APP_CONFIG.output.zip.filename}"`);
-    
-    // Return ZIP file
-    return new NextResponse(zipBuffer, {
-      status: 200,
-      headers
-    });
-    
   } catch (error) {
-    console.error('Error generating package:', error);
-    
+    console.error('Request error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate package' },
-      { status: 500 }
+      { 
+        error: 'Invalid request',
+        code: 'invalid-request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 400 }
     );
   }
 }
 
 /**
- * Fetch processing result from database or cache
- * @param processId Process ID
- * @returns Processing result or null if not found
+ * Get processing status from temporary storage
+ * @param processId Unique identifier for the process
+ * @returns Processing status
  */
-async function fetchProcessingResult(processId: string): Promise<ProcessingResult | null> {
-  // In a real implementation, you would fetch this from a database or cache
-  // For this example, we'll return a mock result
+async function getProcessingStatus(processId: string): Promise<{
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  progress: number;
+  message?: string;
+  error?: string;
+  updatedAt: string;
+}> {
+  // Use system temp directory or configured directory
+  const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
   
-  // This is just a placeholder - in a real app, you would implement actual data retrieval
-  if (processId === 'test-process-id') {
-    return {
-      originalFile: {
-        buffer: Buffer.from('test-file-data'),
-        originalName: 'logo.svg',
-        mimeType: 'image/svg+xml',
-        size: 15000,
-        fileType: 'svg'
-      },
-      optimizedSvg: '<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="50" fill="blue"/></svg>',
-      pngFallback: Buffer.from('test-png-data'),
-      vmlCode: '<v:oval style="width:100px;height:100px" fillcolor="blue"></v:oval>',
-      base64DataUri: 'data:image/png;base64,dGVzdC1wbmctZGF0YQ==',
-      htmlSnippet: '<div>Test HTML snippet with fallbacks</div>',
-      warnings: [],
-      metadata: {
-        originalFileSize: 15000,
-        optimizedFileSize: 8000,
-        compressionRatio: 1.875,
-        processingTime: 350,
-        generatedAt: new Date().toISOString()
-      }
-    };
+  // Get status file path
+  const statusPath = path.join(tempDir, `${processId}.status.json`);
+  
+  try {
+    // Read status file
+    const statusStr = await fs.readFile(statusPath, 'utf-8');
+    return JSON.parse(statusStr);
+  } catch (error) {
+    // If file doesn't exist, return pending status
+    if (error instanceof Error && error.message.includes('ENOENT')) {
+      return {
+        status: 'pending',
+        progress: 0,
+        updatedAt: new Date().toISOString()
+      };
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
+}
+
+/**
+ * Get metadata from temporary storage
+ * @param processId Unique identifier for the process
+ * @returns Metadata
+ */
+async function getMetadata(processId: string): Promise<any> {
+  // Use system temp directory or configured directory
+  const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
+  
+  // Get metadata file path
+  const metadataPath = path.join(tempDir, `${processId}.meta.json`);
+  
+  // Read metadata file
+  const metadataStr = await fs.readFile(metadataPath, 'utf-8');
+  return JSON.parse(metadataStr);
+}
+
+/**
+ * Create ZIP package with all files
+ * @param processId Unique identifier for the process
+ * @param metadata Processing metadata
+ * @returns ZIP file buffer
+ */
+async function createZipPackage(processId: string, metadata: any): Promise<Buffer> {
+  // Use system temp directory or configured directory
+  const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
+  
+  // Create new ZIP file
+  const zip = new JSZip();
+  
+  // Add HTML snippet
+  const htmlPath = path.join(tempDir, `${processId}.html`);
+  const htmlContent = await fs.readFile(htmlPath, 'utf-8');
+  zip.file('email-logo.html', htmlContent);
+  
+  // Add PNG fallback
+  const pngPath = path.join(tempDir, `${processId}.png`);
+  const pngContent = await fs.readFile(pngPath);
+  zip.file('email-logo.png', pngContent);
+  
+  // Add SVG if available
+  try {
+    const svgPath = path.join(tempDir, `${processId}.svg`);
+    const svgContent = await fs.readFile(svgPath, 'utf-8');
+    zip.file('email-logo.svg', svgContent);
+  } catch (error) {
+    // SVG might not exist, ignore error
   }
   
-  return null;
+  // Add VML if available
+  try {
+    const vmlPath = path.join(tempDir, `${processId}.vml`);
+    const vmlContent = await fs.readFile(vmlPath, 'utf-8');
+    zip.file('email-logo.vml', vmlContent);
+  } catch (error) {
+    // VML might not exist, ignore error
+  }
+  
+  // Add README with instructions
+  const readme = generateReadme(metadata);
+  zip.file('README.md', readme);
+  
+  // Generate ZIP file
+  return zip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: {
+      level: APP_CONFIG.output.zip.compression
+    }
+  });
+}
+
+/**
+ * Generate README with instructions
+ * @param metadata Processing metadata
+ * @returns README content
+ */
+function generateReadme(metadata: any): string {
+  return `# Email Logo Package
+
+This package contains all the files needed to use your logo in email campaigns with maximum compatibility across email clients.
+
+## Files Included
+
+- \`email-logo.html\`: HTML code snippet with all fallbacks for email clients
+- \`email-logo.png\`: PNG fallback image for clients that don't support SVG or VML
+- \`email-logo.svg\`: SVG vector image (if original was SVG)
+- \`email-logo.vml\`: VML code for Outlook Desktop (if conversion was possible)
+
+## Usage Instructions
+
+1. Copy the contents of \`email-logo.html\` into your email template
+2. The HTML includes all necessary fallbacks for different email clients
+3. No external hosting is required as all assets are embedded as data URIs
+
+## Email Client Compatibility
+
+- Apple Mail: Uses SVG for best quality
+- Gmail: Uses PNG fallback
+- Outlook Desktop: Uses VML for vector quality
+- Other clients: Default to PNG fallback
+
+## Original File Information
+
+- Filename: ${metadata.originalFile.name}
+- File size: ${formatFileSize(metadata.originalFile.size)}
+- File type: ${metadata.originalFile.type.toUpperCase()}
+
+## Processing Information
+
+- Original size: ${formatFileSize(metadata.metadata.originalFileSize)}
+- Optimized size: ${formatFileSize(metadata.metadata.optimizedFileSize)}
+- Compression ratio: ${Math.round(metadata.metadata.compressionRatio * 100)}%
+- Generated on: ${new Date(metadata.metadata.generatedAt).toLocaleString()}
+
+## Support
+
+This package was generated by CompatimageGen.
+`;
+}
+
+/**
+ * Format file size in human-readable format
+ * @param bytes File size in bytes
+ * @returns Formatted file size
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  } else if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  } else {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
 }

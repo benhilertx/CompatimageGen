@@ -7,10 +7,25 @@ import path from 'path';
 import { FileData, FileType } from '@/types';
 import os from 'os';
 
+// Configure API route options
+export const config = {
+  api: {
+    // Disable default body parser to handle file uploads
+    bodyParser: false,
+    // Set response limit to 4MB
+    responseLimit: '4mb',
+  },
+};
+
 /**
  * API route for file uploads
  */
 export async function POST(request: NextRequest) {
+  // Initialize cleanup process if running on server
+  if (typeof window === 'undefined') {
+    await initializeCleanup();
+  }
+  
   try {
     // Check if request is multipart form data
     const contentType = request.headers.get('content-type') || '';
@@ -186,4 +201,77 @@ function scheduleCleanup(filePath: string): void {
       console.log(`Failed to clean up temporary file: ${filePath}`, error);
     }
   }, 3600000);
+}
+
+// Initialize cleanup process for all temporary files
+// This runs only on the server side when the API is first accessed
+let cleanupInitialized = false;
+
+async function initializeCleanup() {
+  if (cleanupInitialized) return;
+  
+  try {
+    // Use system temp directory or configured directory
+    const tempDir = APP_CONFIG.upload.tempDir || path.join(os.tmpdir(), 'compatimage-uploads');
+    
+    // Create temp directory if it doesn't exist
+    await fs.mkdir(tempDir, { recursive: true });
+    
+    // Get all files in the directory
+    const files = await fs.readdir(tempDir);
+    
+    // Get current time
+    const now = Date.now();
+    
+    // Check each file
+    for (const file of files) {
+      try {
+        const filePath = path.join(tempDir, file);
+        const stats = await fs.stat(filePath);
+        
+        // If file is older than expiry time, delete it
+        if (now - stats.mtimeMs > APP_CONFIG.upload.tempFileExpiry) {
+          await fs.unlink(filePath);
+          console.log(`Cleaned up old temporary file: ${filePath}`);
+        }
+      } catch (error) {
+        // Ignore errors for individual files
+        console.log(`Error checking file: ${file}`, error);
+      }
+    }
+    
+    // Set up periodic cleanup
+    setInterval(async () => {
+      try {
+        // Get all files in the directory
+        const files = await fs.readdir(tempDir);
+        
+        // Get current time
+        const now = Date.now();
+        
+        // Check each file
+        for (const file of files) {
+          try {
+            const filePath = path.join(tempDir, file);
+            const stats = await fs.stat(filePath);
+            
+            // If file is older than expiry time, delete it
+            if (now - stats.mtimeMs > APP_CONFIG.upload.tempFileExpiry) {
+              await fs.unlink(filePath);
+              console.log(`Cleaned up old temporary file: ${filePath}`);
+            }
+          } catch (error) {
+            // Ignore errors for individual files
+          }
+        }
+      } catch (error) {
+        console.error('Error during periodic cleanup:', error);
+      }
+    }, APP_CONFIG.upload.cleanupInterval);
+    
+    cleanupInitialized = true;
+    console.log('Initialized periodic file cleanup process');
+  } catch (error) {
+    console.error('Failed to initialize cleanup process:', error);
+  }
 }

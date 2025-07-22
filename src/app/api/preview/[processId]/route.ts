@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ClientPreview, ProcessingResult } from '@/types';
-import { PreviewGeneratorService } from '@/lib/services/preview-generator-service';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
+import { APP_CONFIG } from '@/config/app-config';
+import { ClientPreview, EMAIL_CLIENTS } from '@/types';
 
 /**
- * GET /api/preview/:processId
- * Returns preview data for a processed file
+ * API route for getting preview data
  */
 export async function GET(
   request: NextRequest,
@@ -13,88 +15,237 @@ export async function GET(
   try {
     const { processId } = params;
     
-    // In a real implementation, you would fetch the processing result from a database or cache
-    // For this demo, we'll create mock data
-    const mockResult = getMockProcessingResult(processId);
+    if (!processId) {
+      return NextResponse.json(
+        { 
+          error: 'Missing processId',
+          code: 'missing-processid'
+        },
+        { status: 400 }
+      );
+    }
     
-    // Generate previews
-    const previews = await PreviewGeneratorService.generateClientPreviews(mockResult);
-    
-    // Generate text previews
-    const textPreviews = PreviewGeneratorService.generateTextPreviews(previews);
-    
-    // Return preview data
-    return NextResponse.json({
-      previews,
-      textPreviews,
-      htmlCode: mockResult.htmlSnippet
-    });
+    try {
+      // Check if processing is complete
+      const statusData = await getProcessingStatus(processId);
+      
+      if (statusData.status !== 'complete') {
+        return NextResponse.json(
+          { 
+            error: 'Processing not complete',
+            code: 'processing-incomplete',
+            status: statusData.status
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Get HTML code
+      const htmlCode = await getHtmlCode(processId);
+      
+      // Get metadata
+      const metadata = await getMetadata(processId);
+      
+      // Generate previews
+      const previews = generatePreviews(metadata);
+      
+      // Generate text previews
+      const textPreviews = generateTextPreviews(previews);
+      
+      return NextResponse.json({
+        htmlCode,
+        previews,
+        textPreviews,
+        metadata: metadata.metadata
+      });
+    } catch (error) {
+      console.error('Preview retrieval error:', error);
+      
+      // Check if file not found
+      if (error instanceof Error && error.message.includes('ENOENT')) {
+        return NextResponse.json(
+          { 
+            error: 'Process not found',
+            code: 'process-not-found',
+            details: error.message
+          },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json(
+        { 
+          error: 'Failed to retrieve preview data',
+          code: 'preview-retrieval-failed',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Error generating previews:', error);
+    console.error('Request error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate previews' },
-      { status: 500 }
+      { 
+        error: 'Invalid request',
+        code: 'invalid-request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 400 }
     );
   }
 }
 
 /**
- * Mock function to get processing result
- * In a real implementation, this would fetch from a database or cache
+ * Get processing status from temporary storage
+ * @param processId Unique identifier for the process
+ * @returns Processing status
  */
-function getMockProcessingResult(processId: string): ProcessingResult {
-  // This is a placeholder for demo purposes
-  // In a real implementation, you would fetch the actual processing result
-  return {
-    originalFile: {
-      buffer: Buffer.from('test'),
-      originalName: 'logo.svg',
-      mimeType: 'image/svg+xml',
-      size: 1024,
-      fileType: 'svg'
-    },
-    optimizedSvg: '<svg width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="#0066cc" /></svg>',
-    pngFallback: Buffer.from('mock-png-data'),
-    vmlCode: '<v:oval style="width:200px;height:200px" fillcolor="#0066cc"></v:oval>',
-    base64DataUri: 'data:image/png;base64,bW9jay1wbmctZGF0YQ==',
-    htmlSnippet: `<!-- CompatimageGen Email Logo - Begin -->
-<div style="max-width: 200px; margin: 0 auto;">
-  <div style="height: 0; padding-bottom: 100%; position: relative;">
-    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-      <!--[if mso]>
-      <v:oval style="width:200px;height:200px" fillcolor="#0066cc"></v:oval>
-      <![endif]-->
-      <!--[if !mso]><!-->
-      <div style="display: block; width: 100%; height: 100%;">
-        <svg width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Company Logo"><title>Company Logo</title><circle cx="100" cy="100" r="90" fill="#0066cc" /></svg>
-      </div>
-      <!--<![endif]-->
-      <!--[if !vml]><!-->
-      <img src="data:image/png;base64,bW9jay1wbmctZGF0YQ==" 
-        width="200" 
-        height="200" 
-        alt="Company Logo" 
-        style="display: block; width: 100%; height: auto; max-width: 100%;" 
-        role="img" 
-        aria-label="Company Logo">
-      <!--<![endif]-->
-    </div>
-  </div>
-</div>
-<!-- CompatimageGen Email Logo - End -->`,
-    warnings: [
-      {
-        type: 'svg-complexity',
-        message: 'SVG is simple and should render well in all clients',
-        severity: 'low'
-      }
-    ],
-    metadata: {
-      originalFileSize: 1024,
-      optimizedFileSize: 512,
-      compressionRatio: 0.5,
-      processingTime: 250,
-      generatedAt: new Date().toISOString()
+async function getProcessingStatus(processId: string): Promise<{
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  progress: number;
+  message?: string;
+  error?: string;
+  updatedAt: string;
+}> {
+  // Use system temp directory or configured directory
+  const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
+  
+  // Get status file path
+  const statusPath = path.join(tempDir, `${processId}.status.json`);
+  
+  try {
+    // Read status file
+    const statusStr = await fs.readFile(statusPath, 'utf-8');
+    return JSON.parse(statusStr);
+  } catch (error) {
+    // If file doesn't exist, return pending status
+    if (error instanceof Error && error.message.includes('ENOENT')) {
+      return {
+        status: 'pending',
+        progress: 0,
+        updatedAt: new Date().toISOString()
+      };
     }
-  };
+    
+    // Re-throw other errors
+    throw error;
+  }
+}
+
+/**
+ * Get HTML code from temporary storage
+ * @param processId Unique identifier for the process
+ * @returns HTML code
+ */
+async function getHtmlCode(processId: string): Promise<string> {
+  // Use system temp directory or configured directory
+  const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
+  
+  // Get HTML file path
+  const htmlPath = path.join(tempDir, `${processId}.html`);
+  
+  // Read HTML file
+  return fs.readFile(htmlPath, 'utf-8');
+}
+
+/**
+ * Get metadata from temporary storage
+ * @param processId Unique identifier for the process
+ * @returns Metadata
+ */
+async function getMetadata(processId: string): Promise<any> {
+  // Use system temp directory or configured directory
+  const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
+  
+  // Get metadata file path
+  const metadataPath = path.join(tempDir, `${processId}.meta.json`);
+  
+  // Read metadata file
+  const metadataStr = await fs.readFile(metadataPath, 'utf-8');
+  return JSON.parse(metadataStr);
+}
+
+/**
+ * Generate previews for email clients
+ * @param metadata Processing metadata
+ * @returns Array of client previews
+ */
+function generatePreviews(metadata: any): ClientPreview[] {
+  // Get file types available
+  const hasSvg = !!metadata.originalFile.type === 'svg';
+  const hasVml = !!metadata.vmlCode;
+  
+  // Generate previews for each client
+  return EMAIL_CLIENTS.slice(0, 3).map(client => {
+    // Determine fallback type
+    let fallbackUsed = client.preferredFallback;
+    
+    // If preferred fallback is not available, use PNG
+    if (fallbackUsed === 'svg' && !hasSvg) {
+      fallbackUsed = 'png';
+    } else if (fallbackUsed === 'vml' && !hasVml) {
+      fallbackUsed = 'png';
+    }
+    
+    // Determine quality rating
+    let estimatedQuality = 'excellent';
+    if (fallbackUsed !== client.preferredFallback) {
+      estimatedQuality = 'good';
+    }
+    
+    // If using PNG for a client that prefers SVG or VML, quality is good
+    if (fallbackUsed === 'png' && client.preferredFallback !== 'png') {
+      estimatedQuality = 'good';
+    }
+    
+    // Return preview
+    return {
+      client: client.id,
+      fallbackUsed,
+      estimatedQuality,
+    } as ClientPreview;
+  });
+}
+
+/**
+ * Generate text previews for email clients
+ * @param previews Client previews
+ * @returns Array of text previews
+ */
+function generateTextPreviews(previews: ClientPreview[]): string[] {
+  return previews.map(preview => {
+    const client = EMAIL_CLIENTS.find(c => c.id === preview.client);
+    if (!client) return '';
+    
+    let qualityText = '';
+    switch (preview.estimatedQuality) {
+      case 'excellent':
+        qualityText = 'excellent quality';
+        break;
+      case 'good':
+        qualityText = 'good quality';
+        break;
+      case 'fair':
+        qualityText = 'fair quality';
+        break;
+      case 'poor':
+        qualityText = 'reduced quality';
+        break;
+    }
+    
+    let fallbackText = '';
+    switch (preview.fallbackUsed) {
+      case 'svg':
+        fallbackText = 'SVG vector format';
+        break;
+      case 'png':
+        fallbackText = 'PNG raster format';
+        break;
+      case 'vml':
+        fallbackText = 'VML vector format';
+        break;
+    }
+    
+    return `${client.name} (${client.marketShare}% market share): Will use ${fallbackText} with ${qualityText}`;
+  });
 }
