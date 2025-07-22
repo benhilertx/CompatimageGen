@@ -1,7 +1,7 @@
 import { FileData, FileType, ProcessingOptions, ProcessingResult, ValidationResult, Warning } from '../../types';
 import { APP_CONFIG } from '../../config/app-config';
-import sharp from 'sharp';
 import { SVGProcessingService } from './svg-processing-service';
+import { ImageProcessingService } from './image-processing-service';
 
 /**
  * Service for processing uploaded files
@@ -102,13 +102,14 @@ export class FileProcessingService {
       result.optimizedSvg = svgString;
     }
     
-    // Generate PNG fallback
+    // Generate PNG fallback using ImageProcessingService
     try {
       const dimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
-      result.pngFallback = await sharp(Buffer.from(result.optimizedSvg || svgString))
-        .resize(dimensions.width, dimensions.height)
-        .png(APP_CONFIG.processing.imageOptions.png)
-        .toBuffer();
+      result.pngFallback = await ImageProcessingService.generatePngFromSvg(
+        result.optimizedSvg || svgString,
+        dimensions.width,
+        dimensions.height
+      );
     } catch (error) {
       console.error('PNG fallback generation error:', error);
       result.warnings?.push({
@@ -121,7 +122,10 @@ export class FileProcessingService {
     }
     
     // Generate base64 data URI
-    result.base64DataUri = `data:image/png;base64,${result.pngFallback.toString('base64')}`;
+    result.base64DataUri = ImageProcessingService.convertToBase64DataUri(
+      result.pngFallback,
+      'image/png'
+    );
     
     // TODO: Generate VML code (will be implemented in VML generation service)
     result.vmlCode = '<!-- VML code will be generated here -->';
@@ -140,19 +144,25 @@ export class FileProcessingService {
   ): Promise<void> {
     const dimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
     
-    // Optimize image
+    // Optimize image using ImageProcessingService
     try {
-      const imageOptions = fileData.fileType === 'png' 
-        ? APP_CONFIG.processing.imageOptions.png 
-        : APP_CONFIG.processing.imageOptions.jpeg;
+      const optimizationResult = await ImageProcessingService.optimizeImage(
+        fileData.buffer,
+        fileData.mimeType,
+        {
+          width: dimensions.width,
+          height: dimensions.height,
+          optimizationLevel: options.optimizationLevel
+        }
+      );
       
-      const sharpInstance = sharp(fileData.buffer)
-        .resize(dimensions.width, dimensions.height);
+      // Store the optimized image as PNG fallback
+      result.pngFallback = optimizationResult.buffer;
       
-      // Apply format-specific options
-      result.pngFallback = await (fileData.fileType === 'png' 
-        ? sharpInstance.png(imageOptions).toBuffer()
-        : sharpInstance.png(APP_CONFIG.processing.imageOptions.png).toBuffer());
+      // Add any warnings from the optimization process
+      if (result.warnings && optimizationResult.warnings.length > 0) {
+        result.warnings.push(...optimizationResult.warnings);
+      }
     } catch (error) {
       console.error('Image processing error:', error);
       result.warnings?.push({
@@ -160,11 +170,33 @@ export class FileProcessingService {
         message: 'Image optimization failed, using original image',
         severity: 'medium'
       });
-      result.pngFallback = fileData.buffer;
+      
+      // If optimization fails, try to convert to PNG without optimization
+      try {
+        if (fileData.fileType === 'png') {
+          result.pngFallback = await ImageProcessingService.compressPng(fileData.buffer);
+        } else if (fileData.fileType === 'jpeg') {
+          // Convert JPEG to PNG for consistency
+          result.pngFallback = await ImageProcessingService.compressJpeg(fileData.buffer);
+        } else {
+          // Fallback to original buffer
+          result.pngFallback = fileData.buffer;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback image processing error:', fallbackError);
+        // Create a simple fallback image as last resort
+        result.pngFallback = await ImageProcessingService.createFallbackImage(
+          dimensions.width,
+          dimensions.height
+        );
+      }
     }
     
     // Generate base64 data URI
-    result.base64DataUri = `data:image/png;base64,${result.pngFallback.toString('base64')}`;
+    result.base64DataUri = ImageProcessingService.convertToBase64DataUri(
+      result.pngFallback,
+      'image/png'
+    );
     
     // No SVG or VML for image inputs
     result.vmlCode = '<!-- VML code will be generated here -->';
@@ -202,17 +234,12 @@ export class FileProcessingService {
   private static async createFallbackImage(options: ProcessingOptions): Promise<Buffer> {
     const dimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
     
-    // Create a simple colored square as fallback
-    return await sharp({
-      create: {
-        width: dimensions.width,
-        height: dimensions.height,
-        channels: 4,
-        background: { r: 200, g: 200, b: 200, alpha: 1 }
-      }
-    })
-    .png()
-    .toBuffer();
+    // Use ImageProcessingService to create a fallback image
+    return await ImageProcessingService.createFallbackImage(
+      dimensions.width,
+      dimensions.height,
+      { r: 200, g: 200, b: 200, alpha: 1 }
+    );
   }
   
   /**
