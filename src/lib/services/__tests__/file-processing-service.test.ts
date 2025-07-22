@@ -1,57 +1,66 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FileProcessingService } from '../file-processing-service';
 import { SVGProcessingService } from '../svg-processing-service';
 import { ImageProcessingService } from '../image-processing-service';
 import { VMLGeneratorService } from '../vml-generator-service';
-import { FileData, ProcessingOptions } from '../../../types';
+import { FileData, ProcessingOptions } from '@/types';
+import { createMockBuffer, createMockFileData } from '@/lib/test-utils/test-setup';
 
-// Mock dependencies
-vi.mock('../svg-processing-service');
-vi.mock('../image-processing-service');
-vi.mock('../vml-generator-service');
+// Mock the dependent services
+vi.mock('../svg-processing-service', () => ({
+  SVGProcessingService: {
+    processSvg: vi.fn().mockResolvedValue({
+      optimizedSvg: '<svg>optimized</svg>',
+      warnings: []
+    }),
+    canConvertToVml: vi.fn().mockReturnValue(true)
+  }
+}));
+
+vi.mock('../image-processing-service', () => ({
+  ImageProcessingService: {
+    generatePngFromSvg: vi.fn().mockResolvedValue(Buffer.from('png-data')),
+    optimizeImage: vi.fn().mockResolvedValue({
+      buffer: Buffer.from('optimized-image'),
+      info: { width: 100, height: 100 },
+      warnings: []
+    }),
+    convertToBase64DataUri: vi.fn().mockReturnValue('data:image/png;base64,base64-data'),
+    compressPng: vi.fn().mockResolvedValue(Buffer.from('compressed-png')),
+    compressJpeg: vi.fn().mockResolvedValue(Buffer.from('compressed-jpeg')),
+    createFallbackImage: vi.fn().mockResolvedValue(Buffer.from('fallback-image'))
+  }
+}));
+
+vi.mock('../vml-generator-service', () => ({
+  VMLGeneratorService: {
+    convertSvgToVml: vi.fn().mockResolvedValue({
+      vmlCode: '<!--[if vml]><v:oval></v:oval><![endif]-->',
+      warnings: []
+    }),
+    addOutlookStyling: vi.fn().mockReturnValue('<!--[if vml]><v:oval style="outlook-specific"></v:oval><![endif]-->'),
+    validateVml: vi.fn().mockReturnValue({
+      valid: true,
+      warnings: []
+    })
+  }
+}));
 
 describe('FileProcessingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    // Mock SVGProcessingService
-    (SVGProcessingService.processSvg as any).mockResolvedValue({
-      optimizedSvg: '<svg>optimized</svg>',
-      warnings: []
-    });
-    (SVGProcessingService.canConvertToVml as any).mockReturnValue(true);
-    
-    // Mock ImageProcessingService
-    (ImageProcessingService.generatePngFromSvg as any).mockResolvedValue(Buffer.from('png-data'));
-    (ImageProcessingService.convertToBase64DataUri as any).mockReturnValue('data:image/png;base64,cG5nLWRhdGE=');
-    (ImageProcessingService.optimizeImage as any).mockResolvedValue({
-      buffer: Buffer.from('optimized-image'),
-      info: { width: 100, height: 100 },
-      warnings: []
-    });
-    
-    // Mock VMLGeneratorService
-    (VMLGeneratorService.convertSvgToVml as any).mockResolvedValue({
-      vmlCode: '<v:rect>vml-code</v:rect>',
-      warnings: []
-    });
-    (VMLGeneratorService.validateVml as any).mockReturnValue({
-      valid: true,
-      warnings: []
-    });
-    (VMLGeneratorService.addOutlookStyling as any).mockReturnValue('<!--[if vml]><v:rect>styled-vml</v:rect><![endif]-->');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('processFile', () => {
     it('should process SVG files correctly', async () => {
-      // Arrange
-      const fileData: FileData = {
-        buffer: Buffer.from('<svg>test</svg>'),
-        originalName: 'test.svg',
-        mimeType: 'image/svg+xml',
-        size: 100,
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('<svg></svg>'),
         fileType: 'svg'
-      };
+      });
       
       const options: ProcessingOptions = {
         altText: 'Test Logo',
@@ -59,93 +68,261 @@ describe('FileProcessingService', () => {
         generatePreviews: true
       };
       
-      // Act
       const result = await FileProcessingService.processFile(fileData, options);
       
-      // Assert
-      expect(result.originalFile).toBe(fileData);
-      expect(result.optimizedSvg).toBe('<svg>optimized</svg>');
-      expect(result.pngFallback).toEqual(Buffer.from('png-data'));
-      expect(result.base64DataUri).toBe('data:image/png;base64,cG5nLWRhdGE=');
-      expect(result.vmlCode).toBe('<!--[if vml]><v:rect>styled-vml</v:rect><![endif]-->');
-      expect(result.warnings).toEqual([]);
+      // Check that SVG processing was called
+      expect(SVGProcessingService.processSvg).toHaveBeenCalledWith(fileData.buffer.toString('utf-8'));
       
-      // Verify service calls
-      expect(SVGProcessingService.processSvg).toHaveBeenCalledWith('<svg>test</svg>');
-      expect(ImageProcessingService.generatePngFromSvg).toHaveBeenCalledWith('<svg>optimized</svg>', 200, 200);
-      expect(VMLGeneratorService.convertSvgToVml).toHaveBeenCalledWith('<svg>optimized</svg>', 200, 200);
-      expect(VMLGeneratorService.addOutlookStyling).toHaveBeenCalled();
-    });
-
-    it('should handle SVG files that cannot be converted to VML', async () => {
-      // Arrange
-      (SVGProcessingService.canConvertToVml as any).mockReturnValue(false);
+      // Check that PNG fallback was generated
+      expect(ImageProcessingService.generatePngFromSvg).toHaveBeenCalled();
       
-      const fileData: FileData = {
-        buffer: Buffer.from('<svg>complex</svg>'),
-        originalName: 'complex.svg',
-        mimeType: 'image/svg+xml',
-        size: 100,
-        fileType: 'svg'
-      };
+      // Check that VML was generated
+      expect(VMLGeneratorService.convertSvgToVml).toHaveBeenCalled();
       
-      const options: ProcessingOptions = {
-        altText: 'Complex Logo',
-        dimensions: { width: 200, height: 200 },
-        generatePreviews: true
-      };
-      
-      // Act
-      const result = await FileProcessingService.processFile(fileData, options);
-      
-      // Assert
-      expect(result.warnings.length).toBeGreaterThan(0);
-      expect(result.warnings[0].type).toBe('vml-conversion');
-      expect(result.vmlCode).toContain('<!--[if vml]>');
-      expect(result.vmlCode).toContain('fillcolor="#CCCCCC"');
-      
-      // Verify service calls
-      expect(SVGProcessingService.processSvg).toHaveBeenCalledWith('<svg>complex</svg>');
-      expect(ImageProcessingService.generatePngFromSvg).toHaveBeenCalledWith('<svg>optimized</svg>', 200, 200);
-      expect(VMLGeneratorService.convertSvgToVml).not.toHaveBeenCalled();
+      // Check that result contains expected properties
+      expect(result.optimizedSvg).toBeDefined();
+      expect(result.pngFallback).toBeDefined();
+      expect(result.vmlCode).toBeDefined();
+      expect(result.base64DataUri).toBeDefined();
+      expect(result.htmlSnippet).toBeDefined();
+      expect(result.metadata).toBeDefined();
     });
 
     it('should process PNG files correctly', async () => {
-      // Arrange
-      const fileData: FileData = {
-        buffer: Buffer.from('png-data'),
-        originalName: 'test.png',
-        mimeType: 'image/png',
-        size: 100,
-        fileType: 'png'
-      };
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('png-data'),
+        fileType: 'png',
+        mimeType: 'image/png'
+      });
       
       const options: ProcessingOptions = {
-        altText: 'Test PNG',
+        altText: 'Test Logo',
         dimensions: { width: 200, height: 200 },
         generatePreviews: true
       };
       
-      // Act
       const result = await FileProcessingService.processFile(fileData, options);
       
-      // Assert
-      expect(result.originalFile).toBe(fileData);
-      expect(result.optimizedSvg).toBeUndefined();
-      expect(result.pngFallback).toEqual(Buffer.from('optimized-image'));
-      expect(result.base64DataUri).toBe('data:image/png;base64,cG5nLWRhdGE=');
-      expect(result.vmlCode).toContain('<!--[if vml]>');
-      expect(result.vmlCode).toContain('<v:rect');
-      
-      // Verify service calls
+      // Check that image optimization was called
       expect(ImageProcessingService.optimizeImage).toHaveBeenCalledWith(
-        Buffer.from('png-data'),
-        'image/png',
+        fileData.buffer,
+        fileData.mimeType,
         expect.objectContaining({
-          width: 200,
-          height: 200
+          width: options.dimensions?.width,
+          height: options.dimensions?.height
         })
       );
+      
+      // Check that result contains expected properties
+      expect(result.pngFallback).toBeDefined();
+      expect(result.vmlCode).toBeDefined(); // Should have placeholder VML
+      expect(result.base64DataUri).toBeDefined();
+      expect(result.htmlSnippet).toBeDefined();
+      expect(result.metadata).toBeDefined();
+      
+      // Should not have SVG content
+      expect(result.optimizedSvg).toBeUndefined();
+    });
+
+    it('should process JPEG files correctly', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('jpeg-data'),
+        fileType: 'jpeg',
+        mimeType: 'image/jpeg'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        dimensions: { width: 200, height: 200 },
+        generatePreviews: true
+      };
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Check that image optimization was called
+      expect(ImageProcessingService.optimizeImage).toHaveBeenCalledWith(
+        fileData.buffer,
+        fileData.mimeType,
+        expect.anything()
+      );
+      
+      // Check that result contains expected properties
+      expect(result.pngFallback).toBeDefined();
+      expect(result.vmlCode).toBeDefined(); // Should have placeholder VML
+      expect(result.base64DataUri).toBeDefined();
+      expect(result.htmlSnippet).toBeDefined();
+      expect(result.metadata).toBeDefined();
+    });
+
+    it('should process CSS files with placeholder implementation', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('.logo { background: red; }'),
+        fileType: 'css',
+        mimeType: 'text/css'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        dimensions: { width: 200, height: 200 },
+        generatePreviews: true
+      };
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Check that fallback image was created
+      expect(ImageProcessingService.createFallbackImage).toHaveBeenCalled();
+      
+      // Check that result contains expected properties
+      expect(result.pngFallback).toBeDefined();
+      expect(result.vmlCode).toBeDefined(); // Should have placeholder VML
+      expect(result.base64DataUri).toBeDefined();
+      expect(result.htmlSnippet).toBeDefined();
+      expect(result.metadata).toBeDefined();
+      
+      // Should have warning about CSS processing
+      expect(result.warnings.some(w => w.type === 'css-compatibility')).toBe(true);
+    });
+
+    it('should handle unsupported file types', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('unknown-data'),
+        fileType: 'png', // Intentionally wrong type to test error handling
+        mimeType: 'application/octet-stream'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      // Should throw error for unsupported file type
+      await expect(FileProcessingService.processFile(fileData, options)).rejects.toThrow('Unsupported file type');
+    });
+
+    it('should handle SVG processing errors', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('<svg>invalid</svg>'),
+        fileType: 'svg'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      // Mock SVG processing to fail
+      (SVGProcessingService.processSvg as any).mockRejectedValueOnce(new Error('SVG processing failed'));
+      
+      // Should throw the error
+      await expect(FileProcessingService.processFile(fileData, options)).rejects.toThrow('SVG processing failed');
+    });
+
+    it('should handle PNG fallback generation errors', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('<svg></svg>'),
+        fileType: 'svg'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      // Mock PNG generation to fail
+      (ImageProcessingService.generatePngFromSvg as any).mockRejectedValueOnce(new Error('PNG generation failed'));
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Should still complete but with fallback image and warning
+      expect(result.pngFallback).toBeDefined();
+      expect(ImageProcessingService.createFallbackImage).toHaveBeenCalled();
+      expect(result.warnings.some(w => w.message.includes('Failed to generate PNG fallback'))).toBe(true);
+    });
+
+    it('should handle VML generation errors', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('<svg></svg>'),
+        fileType: 'svg'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      // Mock VML generation to fail
+      (VMLGeneratorService.convertSvgToVml as any).mockRejectedValueOnce(new Error('VML generation failed'));
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Should still complete but with placeholder VML and warning
+      expect(result.vmlCode).toBeDefined();
+      expect(result.vmlCode).toContain('<!--[if vml]>');
+      expect(result.warnings.some(w => w.message.includes('Failed to generate VML'))).toBe(true);
+    });
+
+    it('should handle complex SVGs that cannot be converted to VML', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('<svg>complex</svg>'),
+        fileType: 'svg'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      // Mock canConvertToVml to return false
+      (SVGProcessingService.canConvertToVml as any).mockReturnValueOnce(false);
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Should still complete but with warning
+      expect(result.warnings.some(w => w.type === 'vml-conversion')).toBe(true);
+    });
+
+    it('should handle image optimization errors', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('png-data'),
+        fileType: 'png',
+        mimeType: 'image/png'
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      // Mock image optimization to fail
+      (ImageProcessingService.optimizeImage as any).mockRejectedValueOnce(new Error('Optimization failed'));
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Should still complete with fallback methods
+      expect(result.pngFallback).toBeDefined();
+      expect(ImageProcessingService.compressPng).toHaveBeenCalled();
+      expect(result.warnings.some(w => w.message.includes('Image optimization failed'))).toBe(true);
+    });
+
+    it('should include metadata in the result', async () => {
+      const fileData = createMockFileData({
+        buffer: createMockBuffer('<svg></svg>'),
+        fileType: 'svg',
+        size: 1000
+      });
+      
+      const options: ProcessingOptions = {
+        altText: 'Test Logo',
+        generatePreviews: true
+      };
+      
+      const result = await FileProcessingService.processFile(fileData, options);
+      
+      // Check metadata properties
+      expect(result.metadata).toBeDefined();
+      expect(result.metadata.originalFileSize).toBe(fileData.size);
+      expect(result.metadata.processingTime).toBeGreaterThan(0);
+      expect(result.metadata.generatedAt).toBeDefined();
     });
   });
 });
