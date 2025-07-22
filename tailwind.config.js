@@ -82,13 +82,7 @@ module.exports = {
       fontSize: {
         'xxs': '0.625rem', // 10px
       },
-      touchAction: {
-        'manipulation': 'manipulation',
-      },
     },
   },
   plugins: [],
-  corePlugins: {
-    touchAction: true,
-  },
 }
