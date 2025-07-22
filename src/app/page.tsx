@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import FileUploadComponent from '@/components/FileUploadComponent';
 import ProcessingStatusComponent from '@/components/ProcessingStatusComponent';
 import PreviewComponent from '@/components/PreviewComponent';
+import DownloadComponent from '@/components/DownloadComponent';
 import { ValidationResult } from '@/types';
 import usePreviewData from '@/lib/hooks/usePreviewData';
 
@@ -147,6 +148,12 @@ export default function Home() {
                 <p>Processing complete! Your files are ready for download.</p>
               </div>
             </div>
+            
+            {/* Download component */}
+            <DownloadComponent 
+              processId={processId as string}
+              onDownloadError={(error) => console.error('Download error:', error)}
+            />
             
             {/* Preview component */}
             <PreviewComponent 
