@@ -2,6 +2,7 @@ import { FileData, FileType, ProcessingOptions, ProcessingResult, ValidationResu
 import { APP_CONFIG } from '../../config/app-config';
 import { SVGProcessingService } from './svg-processing-service';
 import { ImageProcessingService } from './image-processing-service';
+import { VMLGeneratorService } from './vml-generator-service';
 
 /**
  * Service for processing uploaded files
@@ -127,8 +128,56 @@ export class FileProcessingService {
       'image/png'
     );
     
-    // TODO: Generate VML code (will be implemented in VML generation service)
-    result.vmlCode = '<!-- VML code will be generated here -->';
+    // Generate VML code using VMLGeneratorService
+    try {
+      const dimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
+      const canConvertToVml = SVGProcessingService.canConvertToVml(result.optimizedSvg || svgString);
+      
+      if (canConvertToVml) {
+        const vmlResult = await VMLGeneratorService.convertSvgToVml(
+          result.optimizedSvg || svgString,
+          dimensions.width,
+          dimensions.height
+        );
+        
+        result.vmlCode = VMLGeneratorService.addOutlookStyling(vmlResult.vmlCode);
+        
+        // Add any warnings from VML generation
+        if (result.warnings && vmlResult.warnings.length > 0) {
+          result.warnings.push(...vmlResult.warnings);
+        }
+        
+        // Validate the generated VML
+        const validation = VMLGeneratorService.validateVml(result.vmlCode);
+        if (!validation.valid && validation.warnings.length > 0) {
+          result.warnings?.push(...validation.warnings);
+        }
+      } else {
+        result.warnings?.push({
+          type: 'vml-conversion',
+          message: 'SVG contains features that cannot be converted to VML. Using PNG fallback for Outlook.',
+          severity: 'medium'
+        });
+        
+        // Use placeholder VML with warning
+        result.vmlCode = '<!--[if vml]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" style="width:' + 
+          dimensions.width + 'px;height:' + dimensions.height + 
+          'px;" fillcolor="#CCCCCC" stroked="false"><v:textbox inset="0,0,0,0"><center style="color:#666666;font-family:Arial;font-size:12px;">Image</center></v:textbox></v:rect><![endif]-->';
+      }
+    } catch (error) {
+      console.error('VML generation error:', error);
+      result.warnings?.push({
+        type: 'vml-conversion',
+        message: `Failed to generate VML: ${(error as Error).message}`,
+        severity: 'high'
+      });
+      
+      // Use placeholder VML with error
+      const dimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
+      result.vmlCode = '<!--[if vml]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" style="width:' + 
+        dimensions.width + 'px;height:' + dimensions.height + 
+        'px;" fillcolor="#FFCCCC" stroked="false"><v:textbox inset="0,0,0,0"><center style="color:#CC0000;font-family:Arial;font-size:12px;">Error</center></v:textbox></v:rect><![endif]-->';
+    }
   }
   
   /**
@@ -198,8 +247,11 @@ export class FileProcessingService {
       'image/png'
     );
     
-    // No SVG or VML for image inputs
-    result.vmlCode = '<!-- VML code will be generated here -->';
+    // No SVG or VML for image inputs, use placeholder VML
+    const imageDimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
+    result.vmlCode = '<!--[if vml]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" style="width:' + 
+      imageDimensions.width + 'px;height:' + imageDimensions.height + 
+      'px;" filled="true" fillcolor="#FFFFFF" stroked="false"><v:imagedata src="#" o:title="Image"/></v:rect><![endif]-->';
   }
   
   /**
@@ -223,7 +275,11 @@ export class FileProcessingService {
     // Create a fallback image for now
     result.pngFallback = await this.createFallbackImage(options);
     result.base64DataUri = `data:image/png;base64,${result.pngFallback.toString('base64')}`;
-    result.vmlCode = '<!-- VML code will be generated here -->';
+    // Use placeholder VML for CSS files
+    const cssDimensions = options.dimensions || APP_CONFIG.processing.defaultDimensions;
+    result.vmlCode = '<!--[if vml]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" style="width:' + 
+      cssDimensions.width + 'px;height:' + cssDimensions.height + 
+      'px;" fillcolor="#EEEEEE" stroked="false"><v:textbox inset="0,0,0,0"><center style="color:#666666;font-family:Arial;font-size:12px;">CSS Logo</center></v:textbox></v:rect><![endif]-->';
   }
   
   /**
