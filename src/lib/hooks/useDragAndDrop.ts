@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
 interface UseDragAndDropProps {
-  onFileDrop: (files: FileList) => void;
+  onFileDrop: (files: FileList | null | undefined) => void;
 }
 
 interface UseDragAndDropResult {
@@ -45,9 +45,8 @@ export const useDragAndDrop = ({ onFileDrop }: UseDragAndDropProps): UseDragAndD
     e.stopPropagation();
     setDragActive(false);
     
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFileDrop(e.dataTransfer.files);
-    }
+    // Call onFileDrop with the files (or null if no files)
+    onFileDrop(e.dataTransfer.files && e.dataTransfer.files.length > 0 ? e.dataTransfer.files : null);
   }, [onFileDrop]);
   
   // Handle touch start event - visual feedback for touch devices

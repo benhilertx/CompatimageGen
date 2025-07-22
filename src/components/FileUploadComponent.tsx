@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { ValidationResult } from '@/types';
 import { FileValidator } from '@/lib/utils/file-validator';
 import { APP_CONFIG } from '@/config/app-config';
@@ -32,28 +32,38 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
   const maxFileSizeMB = APP_CONFIG.upload.maxFileSize / (1024 * 1024);
   
   // Process uploaded files
-  const handleFiles = (files: FileList) => {
+  const handleFiles = async (files: FileList | null | undefined) => {
+    // Check if files exist and have at least one file
+    if (!files || files.length === 0) {
+      setError("No file was selected or the file is empty");
+      return;
+    }
+    
     const file = files[0]; // Only process the first file
     
     // Reset previous errors and warnings
     setError(null);
     setWarnings([]);
     
-    // Validate file
-    const validationResult = FileValidator.validateFile(file);
-    
-    if (!validationResult.valid) {
-      setError(validationResult.errors[0] || 'Invalid file');
-      return;
+    try {
+      // Validate file (await the Promise)
+      const validationResult = await FileValidator.validateFile(file);
+      
+      if (!validationResult.valid) {
+        setError(validationResult.errors[0] || 'Invalid file');
+        return;
+      }
+      
+      // Set any warnings
+      if (validationResult.warnings.length > 0) {
+        setWarnings(validationResult.warnings);
+      }
+      
+      // Pass the file to the parent component
+      onFileUpload(file, validationResult);
+    } catch (error) {
+      setError(`File validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    // Set any warnings
-    if (validationResult.warnings.length > 0) {
-      setWarnings(validationResult.warnings);
-    }
-    
-    // Pass the file to the parent component
-    onFileUpload(file, validationResult);
   };
   
   // Use the enhanced drag and drop hook with touch support
@@ -72,9 +82,8 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     
-    if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files);
-    }
+    // Pass the files to handleFiles even if empty - it will handle the validation
+    handleFiles(e.target.files);
   };
   
   // Handle file button click
