@@ -203,7 +203,8 @@ export default function Home() {
             {/* Process another file button */}
             <div className="flex justify-center">
               <button 
-                className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors touch-manipulation"
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors"
+                style={{ touchAction: "manipulation" }}
                 onClick={() => {
                   // Reset state to allow new uploads
                   setProcessId(null);

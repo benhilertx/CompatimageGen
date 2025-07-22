@@ -179,7 +179,8 @@ const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
               <button
                 type="button"
                 onClick={handleButtonClick}
-                className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 touch-manipulation"
+                className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                style={{ touchAction: "manipulation" }}
                 aria-label="Browse files"
               >
                 Browse Files

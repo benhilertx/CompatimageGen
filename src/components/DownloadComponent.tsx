@@ -122,11 +122,12 @@ const DownloadComponent: React.FC<DownloadComponentProps> = ({
         <button
           onClick={handleDownload}
           disabled={downloading || isGenerating}
-          className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-md flex items-center justify-center transition-colors touch-manipulation ${
+          className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-md flex items-center justify-center transition-colors ${
             downloading || isGenerating
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800'
           }`}
+          style={{ touchAction: "manipulation" }}
           style={{ minWidth: '180px', minHeight: '48px' }}
           aria-label={downloading ? "Downloading..." : "Download ZIP Package"}
         >
@@ -175,7 +176,8 @@ const DownloadComponent: React.FC<DownloadComponentProps> = ({
             <p className="text-sm sm:text-base">Failed to download package: {error}</p>
           </div>
           <button 
-            className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors touch-manipulation"
+            className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+            style={{ touchAction: "manipulation" }}
             onClick={handleDownload}
             aria-label="Try downloading again"
           >

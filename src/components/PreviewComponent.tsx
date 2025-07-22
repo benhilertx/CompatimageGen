@@ -71,11 +71,12 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
         <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setSelectedClient('all')}
-            className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium touch-manipulation ${
+            className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
               selectedClient === 'all'
                 ? 'bg-primary-100 text-primary-800 border border-primary-300'
                 : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 active:bg-gray-300'
             }`}
+            style={{ touchAction: "manipulation" }}
             aria-pressed={selectedClient === 'all'}
           >
             All Clients
@@ -88,11 +89,12 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
             <button
               key={client.id}
               onClick={() => setSelectedClient(client.id)}
-              className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium touch-manipulation ${
+              className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                 selectedClient === client.id
                   ? 'bg-primary-100 text-primary-800 border border-primary-300'
                   : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 active:bg-gray-300'
               }`}
+              style={{ touchAction: "manipulation" }}
               aria-pressed={selectedClient === client.id}
             >
               {client.name}
@@ -104,7 +106,8 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
         <div className="mb-4">
           <button
             onClick={() => setShowCode(!showCode)}
-            className="px-3 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-800 rounded-md border border-gray-300 transition-colors flex items-center touch-manipulation"
+            className="px-3 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-800 rounded-md border border-gray-300 transition-colors flex items-center"
+            style={{ touchAction: "manipulation" }}
             aria-expanded={showCode}
             aria-controls="html-code-section"
           >
@@ -125,7 +128,8 @@ const PreviewComponent: React.FC<PreviewComponentProps> = ({ previews, htmlCode 
                   navigator.clipboard.writeText(htmlCode);
                   // You could add a toast notification here
                 }}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded border border-gray-300 touch-manipulation"
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded border border-gray-300"
+                style={{ touchAction: "manipulation" }}
                 aria-label="Copy HTML code to clipboard"
               >
                 Copy to Clipboard
