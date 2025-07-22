@@ -1,7 +1,7 @@
-import { FileData, FileType, ProcessingOptions, ProcessingResult, ValidationResult, Warning } from '@/types';
-import { APP_CONFIG } from '@/config/app-config';
+import { FileData, FileType, ProcessingOptions, ProcessingResult, ValidationResult, Warning } from '../../types';
+import { APP_CONFIG } from '../../config/app-config';
 import sharp from 'sharp';
-import { optimize } from 'svgo';
+import { SVGProcessingService } from './svg-processing-service';
 
 /**
  * Service for processing uploaded files
@@ -73,15 +73,30 @@ export class FileProcessingService {
     // Convert buffer to string
     const svgString = fileData.buffer.toString('utf-8');
     
-    // Optimize SVG
+    // Process SVG using SVGProcessingService
     try {
-      const optimized = optimize(svgString, APP_CONFIG.processing.svgoOptions);
-      result.optimizedSvg = optimized.data;
+      const { optimizedSvg, warnings } = await SVGProcessingService.processSvg(svgString);
+      result.optimizedSvg = optimizedSvg;
+      
+      // Add warnings from SVG processing
+      if (result.warnings && warnings.length > 0) {
+        result.warnings.push(...warnings);
+      }
+      
+      // Check if SVG can be converted to VML
+      const canConvertToVml = SVGProcessingService.canConvertToVml(optimizedSvg);
+      if (!canConvertToVml) {
+        result.warnings?.push({
+          type: 'vml-conversion',
+          message: 'This SVG contains features that cannot be converted to VML for Outlook. PNG fallback will be used instead.',
+          severity: 'high'
+        });
+      }
     } catch (error) {
-      console.error('SVG optimization error:', error);
+      console.error('SVG processing error:', error);
       result.warnings?.push({
         type: 'svg-complexity',
-        message: 'SVG optimization failed, using original SVG',
+        message: 'SVG processing failed, using original SVG',
         severity: 'medium'
       });
       result.optimizedSvg = svgString;
