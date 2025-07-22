@@ -12,7 +12,11 @@ export const APP_CONFIG = {
       jpeg: ['image/jpeg', 'image/jpg'],
       css: ['text/css']
     },
-    tempDir: '/tmp/uploads' // Directory for temporary file storage
+    tempDir: process.env.TEMP_UPLOAD_DIR || '', // Will default to os.tmpdir()/compatimage-uploads if empty
+    tempFileExpiry: 3600000, // 1 hour in milliseconds
+    cleanupInterval: 3600000, // 1 hour in milliseconds
+    maxConcurrentUploads: 10,
+    validateFileStructure: true
   },
   
   // Processing options

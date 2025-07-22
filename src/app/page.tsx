@@ -1,6 +1,71 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
+import FileUploadComponent from '@/components/FileUploadComponent';
+import { ValidationResult } from '@/types';
 
 export default function Home() {
+  // State for file upload
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
+  const [fileId, setFileId] = useState<string | null>(null);
+
+  // Handle file upload
+  const handleFileUpload = async (file: File, validationResult: ValidationResult) => {
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      setUploadSuccess(false);
+      setFileId(null);
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + 5;
+          return newProgress > 90 ? 90 : newProgress;
+        });
+      }, 100);
+
+      // Send file to API
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Clear progress interval
+      clearInterval(progressInterval);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      // Set upload to complete
+      setUploadProgress(100);
+      
+      // Get response data
+      const data = await response.json();
+      setFileId(data.fileId);
+      setUploadSuccess(true);
+
+      // Reset upload state after a delay
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      setIsUploading(false);
+      // Error handling would be implemented here
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 md:p-24">
       <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
@@ -9,15 +74,24 @@ export default function Home() {
           Generate email-compatible logo HTML with fallbacks for all major email clients
         </p>
         
-        {/* Placeholder for FileUploadComponent */}
-        <div className="w-full max-w-2xl mx-auto border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-          <p className="text-gray-500">
-            Drag and drop your logo file here, or click to browse
-          </p>
-          <p className="text-sm text-gray-400 mt-2">
-            Supports SVG, PNG, JPEG, and CSS files (max 1MB)
-          </p>
-        </div>
+        {/* File Upload Component */}
+        <FileUploadComponent 
+          onFileUpload={handleFileUpload}
+          isUploading={isUploading}
+          uploadProgress={uploadProgress}
+        />
+        
+        {/* Upload success message */}
+        {uploadSuccess && (
+          <div className="mt-6 p-4 bg-success-50 border border-success-100 text-success-700 rounded-md">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2 text-success-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <p>File uploaded successfully! Processing will begin shortly.</p>
+            </div>
+          </div>
+        )}
         
         {/* Features section */}
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
