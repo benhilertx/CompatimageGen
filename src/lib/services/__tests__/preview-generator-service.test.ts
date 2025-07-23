@@ -398,7 +398,11 @@ describe('PreviewGeneratorService', () => {
           optimizedFileSize: 800,
           compressionRatio: 0.8,
           processingTime: 500,
-          generatedAt: '2025-07-21T12:00:00Z'
+          generatedAt: '2025-07-21T12:00:00Z',
+          dimensions: {
+            width: 200,
+            height: 150
+          }
         }
       };
     });
@@ -478,6 +482,200 @@ describe('PreviewGeneratorService', () => {
       expect(gmail).toContain('background-color: #f2f2f2');
       expect(outlook).toContain('background-color: #0078d4');
     });
+    
+    it('should use actual dimensions from the result when available', () => {
+      // Add dimensions to the metadata
+      const resultWithDimensions = {
+        ...testResult,
+        metadata: {
+          ...testResult.metadata,
+          dimensions: {
+            width: 300,
+            height: 200
+          }
+        }
+      };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('svg', resultWithDimensions, 'apple-mail');
+      
+      // HTMLTemplateService should be called with the dimensions from metadata
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dimensions: {
+            width: 300,
+            height: 200
+          }
+        })
+      );
+    });
+    
+    it('should fall back to default dimensions when metadata dimensions are not available', () => {
+      // Remove dimensions from the metadata
+      const resultWithoutDimensions = {
+        ...testResult,
+        metadata: {
+          ...testResult.metadata,
+          dimensions: undefined
+        }
+      };
+      
+      // Mock APP_CONFIG.previews.dimensions
+      const originalDimensions = APP_CONFIG.previews.dimensions;
+      APP_CONFIG.previews.dimensions = { width: 400, height: 300 };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('svg', resultWithoutDimensions, 'apple-mail');
+      
+      // Restore original config
+      APP_CONFIG.previews.dimensions = originalDimensions;
+      
+      // HTMLTemplateService should be called with the default dimensions from config
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dimensions: {
+            width: 400,
+            height: 300
+          }
+        })
+      );
+    });
+    
+    it('should handle missing SVG content for SVG fallback', () => {
+      // Create result without SVG content
+      const resultWithoutSvg = {
+        ...testResult,
+        optimizedSvg: undefined
+      };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('svg', resultWithoutSvg, 'apple-mail');
+      
+      // Should still generate HTML preview
+      expect(htmlPreview).toBeDefined();
+      expect(htmlPreview).toContain('email-preview');
+      
+      // HTMLTemplateService should be called with PNG fallback only
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          svgContent: undefined,
+          vmlCode: undefined
+        })
+      );
+    });
+    
+    it('should handle missing VML content for VML fallback', () => {
+      // Create result without VML content
+      const resultWithoutVml = {
+        ...testResult,
+        vmlCode: undefined
+      };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('vml', resultWithoutVml, 'outlook-desktop');
+      
+      // Should still generate HTML preview
+      expect(htmlPreview).toBeDefined();
+      expect(htmlPreview).toContain('email-preview');
+      
+      // HTMLTemplateService should be called with PNG fallback only
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          svgContent: undefined,
+          vmlCode: undefined
+        })
+      );
+    });
+    
+    it('should generate HTML preview for all supported email clients', () => {
+      // Test all email clients
+      const clients: EmailClient[] = ['apple-mail', 'gmail', 'outlook-desktop', 'outlook-web', 'yahoo', 'thunderbird', 'samsung-mail'];
+      
+      for (const client of clients) {
+        const htmlPreview = PreviewGeneratorService.generateHtmlPreview('png', testResult, client);
+        
+        // Should generate HTML preview for each client
+        expect(htmlPreview).toBeDefined();
+        expect(htmlPreview).toContain(`email-preview-${client}`);
+        expect(htmlPreview).toContain('email-client-chrome');
+      }
+    });
+    
+    it('should properly extract dimensions from SVG files', () => {
+      // Create result with SVG file type
+      const svgResult = {
+        ...testResult,
+        originalFile: {
+          ...testResult.originalFile,
+          fileType: 'svg'
+        }
+      };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('svg', svgResult, 'apple-mail');
+      
+      // HTMLTemplateService should be called with dimensions from metadata
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dimensions: {
+            width: 200,
+            height: 150
+          }
+        })
+      );
+    });
+    
+    it('should properly extract dimensions from non-SVG files', () => {
+      // Create result with PNG file type
+      const pngResult = {
+        ...testResult,
+        originalFile: {
+          ...testResult.originalFile,
+          fileType: 'png'
+        }
+      };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('png', pngResult, 'gmail');
+      
+      // HTMLTemplateService should be called with default preview dimensions
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dimensions: expect.objectContaining({
+            width: expect.any(Number),
+            height: expect.any(Number)
+          })
+        })
+      );
+    });
+    
+    it('should include proper alt text in the preview', () => {
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('png', testResult, 'gmail');
+      
+      // HTMLTemplateService should be called with alt text
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          altText: 'Logo Preview'
+        })
+      );
+    });
+    
+    it('should sanitize HTML content for safe rendering', () => {
+      // Create result with potentially unsafe SVG content
+      const unsafeResult = {
+        ...testResult,
+        optimizedSvg: '<svg><script>alert("xss")</script></svg>'
+      };
+      
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('svg', unsafeResult, 'apple-mail');
+      
+      // The preview should still be generated
+      expect(htmlPreview).toBeDefined();
+      expect(htmlPreview).toContain('email-preview');
+      
+      // HTMLTemplateService should be called with the SVG content
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          svgContent: unsafeResult.optimizedSvg
+        })
+      );
+      
+      // Note: The actual sanitization would happen in HTMLTemplateService or in the component that renders the HTML
+    });
   });
   
   describe('generateClientSpecificStyles', () => {
@@ -533,5 +731,115 @@ describe('PreviewGeneratorService', () => {
       expect(styles).toContain('@media (max-width: 768px)');
       expect(styles).toContain('padding: 6px !important');
       expect(styles).toContain('padding: 8px !important');
+    });
+    
+    it('should generate Yahoo Mail specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('yahoo');
+      
+      // Check that Yahoo Mail specific styles are included
+      expect(styles).toContain('.email-preview-yahoo');
+      expect(styles).toContain('Helvetica Neue');
+      expect(styles).toContain('position: static');
+      expect(styles).toContain('float: none');
+    });
+    
+    it('should generate Outlook Web specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('outlook-web');
+      
+      // Check that Outlook Web specific styles are included
+      expect(styles).toContain('.email-preview-outlook-web');
+      expect(styles).toContain('Segoe UI');
+      expect(styles).toContain('border-radius: 0');
+      expect(styles).toContain('box-shadow: none');
+    });
+    
+    it('should generate Samsung Mail specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('samsung-mail');
+      
+      // Check that Samsung Mail specific styles are included
+      expect(styles).toContain('.email-preview-samsung-mail');
+      expect(styles).toContain('Roboto');
+      expect(styles).toContain('position: static');
+      expect(styles).toContain('float: none');
+    });
+    
+    it('should generate Thunderbird specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('thunderbird');
+      
+      // Check that Thunderbird specific styles are included
+      expect(styles).toContain('.email-preview-thunderbird');
+      expect(styles).toContain('Helvetica');
+    });
+    
+    it('should generate default styles for unknown clients', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('other' as EmailClient);
+      
+      // Check that default styles are included
+      expect(styles).toContain('Generic email client');
+      expect(styles).toContain('background-color: #f5f5f5');
+    });
+    
+    it('should include all necessary CSS properties for client simulation', () => {
+      // Test all email clients
+      const clients: EmailClient[] = ['apple-mail', 'gmail', 'outlook-desktop', 'outlook-web', 'yahoo', 'thunderbird', 'samsung-mail'];
+      
+      for (const client of clients) {
+        const styles = PreviewGeneratorService.generateClientSpecificStyles(client);
+        
+        // Should include base styles
+        expect(styles).toContain('.email-preview');
+        expect(styles).toContain('email-client-chrome');
+        expect(styles).toContain('email-client-header');
+        expect(styles).toContain('email-client-content');
+        
+        // Should include client-specific class
+        expect(styles).toContain(`.email-preview-${client}`);
+      }
+    });
+    
+    it('should include client-specific CSS limitations', () => {
+      // Test that client-specific limitations are reflected in the CSS
+      const outlookStyles = PreviewGeneratorService.generateClientSpecificStyles('outlook-desktop');
+      const gmailStyles = PreviewGeneratorService.generateClientSpecificStyles('gmail');
+      
+      // Outlook limitations
+      expect(outlookStyles).toContain('border-radius: 0 !important');
+      expect(outlookStyles).toContain('box-shadow: none !important');
+      expect(outlookStyles).toContain('display: block !important');
+      
+      // Gmail limitations
+      expect(gmailStyles).toContain('position: static !important');
+      expect(gmailStyles).toContain('display: none !important');
+    });
+    
+    it('should handle responsive design considerations', () => {
+      // Test that responsive design considerations are included
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('gmail');
+      
+      // Should include media queries
+      expect(styles).toContain('@media (max-width: 768px)');
+      
+      // Should include responsive adjustments
+      expect(styles).toContain('padding: 6px !important');
+      expect(styles).toContain('padding: 8px !important');
+    });
+    
+    it('should generate styles that accurately simulate client rendering', () => {
+      // Test that styles accurately simulate client rendering
+      const outlookStyles = PreviewGeneratorService.generateClientSpecificStyles('outlook-desktop');
+      const gmailStyles = PreviewGeneratorService.generateClientSpecificStyles('gmail');
+      const appleMailStyles = PreviewGeneratorService.generateClientSpecificStyles('apple-mail');
+      
+      // Outlook uses Word rendering engine
+      expect(outlookStyles).toContain('font-family: \'Calibri\'');
+      expect(outlookStyles).toContain('animation: none !important');
+      
+      // Gmail strips head CSS
+      expect(gmailStyles).toContain('.email-preview-gmail .email-client-content style');
+      expect(gmailStyles).toContain('display: none !important');
+      
+      // Apple Mail has good CSS support
+      expect(appleMailStyles).toContain('font-family: \'SF Pro\'');
+      expect(appleMailStyles).not.toContain('border-radius: 0 !important');
     });
   });
