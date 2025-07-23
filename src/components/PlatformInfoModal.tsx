@@ -103,7 +103,7 @@ const PlatformInfoModal: React.FC<PlatformInfoModalProps> = ({
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
         isOpen ? 'opacity-100' : 'opacity-0'
-      } transition-opacity duration-300`}
+      } transition-opacity duration-300 ease-in-out`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="platform-info-title"
@@ -119,7 +119,7 @@ const PlatformInfoModal: React.FC<PlatformInfoModalProps> = ({
       <div 
         className={`fixed inset-0 bg-black ${
           isOpen ? 'opacity-50' : 'opacity-0'
-        } transition-opacity duration-300`}
+        } transition-opacity duration-300 ease-in-out`}
         aria-hidden="true"
       />
 
@@ -128,7 +128,7 @@ const PlatformInfoModal: React.FC<PlatformInfoModalProps> = ({
         ref={modalRef}
         className={`relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden ${
           isOpen ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
-        } transition-all duration-300`}
+        } transition-all duration-300 ease-in-out`}
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -225,10 +225,10 @@ const PlatformInfoModal: React.FC<PlatformInfoModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+            className="w-full sm:w-auto px-4 py-2 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 shadow-sm"
             style={{ touchAction: "manipulation" }}
           >
             Close

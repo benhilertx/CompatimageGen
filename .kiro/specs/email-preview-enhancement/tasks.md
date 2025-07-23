@@ -58,14 +58,25 @@
   - Ensure keyboard accessibility and focus management
   - _Requirements: 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 6. Update PreviewComponent to include HTML previews
+- [x] 6. Update PreviewComponent to include HTML previews
+
+
+
+
+
   - Modify component to render HTML previews instead of static information
   - Add info icon to each preview card
   - Integrate PlatformInfoModal for displaying details
   - Maintain existing functionality for fallback and quality information
   - _Requirements: 1.1, 1.3, 2.1, 3.2_
 
-- [ ] 7. Implement responsive layout improvements
+- [x] 7. Implement responsive layout improvements
+
+
+
+
+
+
   - Update preview card layout for better organization
   - Optimize for mobile devices with appropriate breakpoints
   - Add smooth transitions between states

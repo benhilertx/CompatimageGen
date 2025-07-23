@@ -131,34 +131,32 @@ const HTMLPreviewRenderer: React.FC<HTMLPreviewRendererProps> = ({
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: '#f9f9f9',
-            zIndex: 1
+            zIndex: 1,
+            transition: 'opacity 0.3s ease-in-out'
           }}
         >
-          <div className="loading-spinner" aria-label="Loading preview">
+          <div className="loading-spinner flex flex-col items-center" aria-label="Loading preview">
             <svg 
-              width="24" 
-              height="24" 
-              viewBox="0 0 24 24" 
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ animation: 'spin 1s linear infinite' }}
+              className="animate-spin h-8 w-8 text-primary-500 mb-2" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24"
             >
-              <style>{`
-                @keyframes spin {
-                  0% { transform: rotate(0deg); }
-                  100% { transform: rotate(360deg); }
-                }
-              `}</style>
               <circle 
+                className="opacity-25" 
                 cx="12" 
                 cy="12" 
                 r="10" 
-                stroke="#ccc" 
-                strokeWidth="4" 
-                fill="none" 
-                strokeDasharray="30 30"
-                strokeLinecap="round"
-              />
+                stroke="currentColor" 
+                strokeWidth="4"
+              ></circle>
+              <path 
+                className="opacity-75" 
+                fill="currentColor" 
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
             </svg>
+            <span className="text-xs text-gray-500">Loading preview...</span>
           </div>
         </div>
       )}
@@ -166,46 +164,27 @@ const HTMLPreviewRenderer: React.FC<HTMLPreviewRendererProps> = ({
       {/* Error message */}
       {hasError && (
         <div 
-          className="error-message"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: '#fff0f0',
-            padding: '1rem',
-            color: '#d32f2f',
-            zIndex: 1
-          }}
+          className="error-message bg-red-50 text-red-600 absolute inset-0 flex flex-col justify-center items-center p-4 z-10 transition-all duration-300"
         >
           <svg 
-            width="24" 
-            height="24" 
-            viewBox="0 0 24 24" 
+            className="w-8 h-8 mb-2"
             fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24" 
             xmlns="http://www.w3.org/2000/svg"
-            style={{ marginBottom: '0.5rem' }}
           >
             <path 
-              d="M12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4ZM2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12Z" 
-              fill="#d32f2f"
-            />
-            <path 
-              d="M12 14C11.4477 14 11 13.5523 11 13V8C11 7.44772 11.4477 7 12 7C12.5523 7 13 7.44772 13 8V13C13 13.5523 12.5523 14 12 14Z" 
-              fill="#d32f2f"
-            />
-            <path 
-              d="M12 17C11.4477 17 11 16.5523 11 16C11 15.4477 11.4477 15 12 15C12.5523 15 13 15.4477 13 16C13 16.5523 12.5523 17 12 17Z" 
-              fill="#d32f2f"
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
             />
           </svg>
-          <p style={{ margin: 0, textAlign: 'center' }}>
+          <p className="text-center text-sm font-medium">
             Unable to render preview
+          </p>
+          <p className="text-center text-xs mt-1">
+            The email client may not support this content
           </p>
         </div>
       )}
@@ -215,15 +194,15 @@ const HTMLPreviewRenderer: React.FC<HTMLPreviewRendererProps> = ({
         ref={iframeRef}
         title={title}
         sandbox="allow-same-origin"
+        className="w-full h-full border-none bg-transparent transition-opacity duration-300 ease-in-out"
         style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          backgroundColor: 'transparent',
           opacity: isLoaded && !hasError ? 1 : 0,
-          transition: 'opacity 0.3s ease'
         }}
         aria-label={`${title} for ${clientId}`}
+        onLoad={() => {
+          setIsLoaded(true);
+          if (onLoad) onLoad();
+        }}
       />
     </div>
   );

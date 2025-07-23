@@ -46,8 +46,9 @@ describe('HTMLPreviewRenderer', () => {
     );
     
     // Check if loading indicator is shown
-    const loadingIndicator = screen.getByLabelText('Loading preview');
-    expect(loadingIndicator).toBeInTheDocument();
+    const loadingSpinner = screen.getByLabelText('Loading preview');
+    expect(loadingSpinner).toBeInTheDocument();
+    expect(screen.getByText('Loading preview...')).toBeInTheDocument();
   });
   
   it('applies custom width and height', () => {
@@ -118,6 +119,7 @@ describe('HTMLPreviewRenderer', () => {
     // Wait for the error message to appear
     await waitFor(() => {
       expect(screen.getByText('Unable to render preview')).toBeInTheDocument();
+      expect(screen.getByText('The email client may not support this content')).toBeInTheDocument();
       expect(mockOnError).toHaveBeenCalled();
     });
   });
