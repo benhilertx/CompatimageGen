@@ -1,6 +1,7 @@
 import { ClientPreview, EmailClient, EMAIL_CLIENTS, FallbackType, ProcessingResult, QualityRating } from '@/types';
 import APP_CONFIG from '@/config/app-config';
 import sharp from 'sharp';
+import HTMLTemplateService from './html-template-service';
 
 /**
  * Service for generating email client previews
@@ -31,12 +32,20 @@ export class PreviewGeneratorService {
         // Generate preview image
         const previewImage = await this.generatePreviewImage(fallbackUsed, result);
         
+        // Generate HTML preview
+        const htmlPreview = this.generateHtmlPreview(fallbackUsed, result, clientConfig.id);
+        
+        // Generate client-specific CSS
+        const clientStyles = this.generateClientSpecificStyles(clientConfig.id);
+        
         // Create preview data
         previews.push({
           client: clientConfig.id,
           fallbackUsed,
           estimatedQuality,
-          previewImage
+          previewImage,
+          htmlPreview,
+          clientStyles
         });
       }
     }
@@ -164,6 +173,151 @@ export class PreviewGeneratorService {
       
       return `${clientName}: Will use ${fallbackName} format with ${preview.estimatedQuality} rendering quality.`;
     });
+  }
+  
+  /**
+   * Generate HTML preview for a specific client
+   * @param fallbackType Fallback type being used
+   * @param result Processing result
+   * @param clientId Email client ID
+   * @returns HTML preview content
+   */
+  static generateHtmlPreview(fallbackType: FallbackType, result: ProcessingResult, clientId: EmailClient): string {
+    // Extract fallback data from processing result
+    const fallbackData = {
+      svgContent: result.optimizedSvg,
+      pngBase64: result.base64DataUri.replace(/^data:image\/png;base64,/, ''),
+      vmlCode: result.vmlCode,
+      dimensions: {
+        width: result.originalFile.fileType === 'svg' ? 200 : 200, // Default preview width
+        height: result.originalFile.fileType === 'svg' ? 200 : 200 // Default preview height
+      },
+      altText: 'Logo Preview'
+    };
+    
+    // Select appropriate fallback based on client and fallback type
+    let htmlContent = '';
+    
+    // For clients that support SVG and we're using SVG fallback
+    if (fallbackType === 'svg' && fallbackData.svgContent) {
+      // Generate HTML with SVG prioritized
+      htmlContent = HTMLTemplateService.generateEmailHtml({
+        ...fallbackData,
+        // For preview purposes, we'll only include the SVG content
+        vmlCode: undefined
+      });
+    } 
+    // For clients that support VML and we're using VML fallback
+    else if (fallbackType === 'vml' && fallbackData.vmlCode) {
+      // Generate HTML with VML prioritized
+      htmlContent = HTMLTemplateService.generateEmailHtml({
+        ...fallbackData,
+        // For preview purposes, we'll only include the VML content
+        svgContent: undefined
+      });
+    } 
+    // For all other cases, use PNG fallback
+    else {
+      // Generate HTML with only PNG fallback
+      htmlContent = HTMLTemplateService.generateEmailHtml({
+        ...fallbackData,
+        svgContent: undefined,
+        vmlCode: undefined
+      });
+    }
+    
+    // Wrap the HTML in a client-specific container
+    return `<div class="email-preview email-preview-${clientId}">
+      ${htmlContent}
+    </div>`;
+  }
+  
+  /**
+   * Generate client-specific CSS for email preview
+   * @param clientId Email client ID
+   * @returns CSS styles as string
+   */
+  static generateClientSpecificStyles(clientId: EmailClient): string {
+    // Base styles for all email previews
+    const baseStyles = `
+      .email-preview {
+        font-family: sans-serif;
+        padding: 10px;
+        background-color: #ffffff;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+    `;
+    
+    // Client-specific styles
+    switch (clientId) {
+      case 'outlook-desktop':
+        return `${baseStyles}
+          /* Outlook Desktop limitations */
+          .email-preview-outlook-desktop {
+            font-family: 'Calibri', sans-serif;
+            background-color: #f9f9f9;
+          }
+          /* Disable unsupported CSS */
+          .email-preview-outlook-desktop * {
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+          }
+        `;
+        
+      case 'gmail':
+        return `${baseStyles}
+          /* Gmail limitations */
+          .email-preview-gmail {
+            font-family: 'Arial', sans-serif;
+            background-color: #ffffff;
+          }
+          /* Gmail strips head CSS */
+          .email-preview-gmail style, 
+          .email-preview-gmail link {
+            display: none !important;
+          }
+        `;
+        
+      case 'apple-mail':
+        return `${baseStyles}
+          /* Apple Mail - modern support */
+          .email-preview-apple-mail {
+            font-family: 'SF Pro', 'Helvetica Neue', sans-serif;
+            background-color: #ffffff;
+          }
+        `;
+        
+      case 'outlook-web':
+        return `${baseStyles}
+          /* Outlook Web App */
+          .email-preview-outlook-web {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f8f8f8;
+          }
+          /* Limited CSS support */
+          .email-preview-outlook-web * {
+            border-radius: 0 !important;
+          }
+        `;
+        
+      case 'yahoo':
+        return `${baseStyles}
+          /* Yahoo Mail */
+          .email-preview-yahoo {
+            font-family: 'Helvetica Neue', Helvetica, sans-serif;
+            background-color: #ffffff;
+          }
+          /* Limited CSS support */
+          .email-preview-yahoo * {
+            position: static !important;
+          }
+        `;
+        
+      default:
+        return baseStyles;
+    }
   }
 }
 

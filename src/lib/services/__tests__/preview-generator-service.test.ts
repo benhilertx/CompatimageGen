@@ -3,6 +3,7 @@ import { PreviewGeneratorService } from '../preview-generator-service';
 import { ClientPreview, ProcessingResult, EmailClient } from '@/types';
 import { APP_CONFIG } from '@/config/app-config';
 import sharp from 'sharp';
+import HTMLTemplateService from '../html-template-service';
 
 // Mock sharp
 vi.mock('sharp', () => {
@@ -14,6 +15,18 @@ vi.mock('sharp', () => {
   
   return {
     default: vi.fn().mockImplementation(() => mockSharpInstance),
+    __esModule: true
+  };
+});
+
+// Mock HTMLTemplateService
+vi.mock('../html-template-service', () => {
+  return {
+    default: {
+      generateEmailHtml: vi.fn().mockReturnValue('<div>Mock HTML Template</div>'),
+      createResponsiveWrapper: vi.fn().mockImplementation((content) => `<div class="wrapper">${content}</div>`),
+      addAccessibilityAttributes: vi.fn().mockImplementation((html, alt) => html)
+    },
     __esModule: true
   };
 });
@@ -73,10 +86,15 @@ describe('PreviewGeneratorService', () => {
         expect(preview.fallbackUsed).toBeDefined();
         expect(preview.estimatedQuality).toBeDefined();
         expect(preview.previewImage).toBeDefined();
+        expect(preview.htmlPreview).toBeDefined();
+        expect(preview.clientStyles).toBeDefined();
       }
       
       // Check that sharp was called for each preview
       expect(sharp).toHaveBeenCalledTimes(3);
+      
+      // Check that HTMLTemplateService was called for each preview
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledTimes(3);
     });
 
     it('should use SVG fallback for clients that support it', async () => {
@@ -322,3 +340,93 @@ describe('PreviewGeneratorService', () => {
     });
   });
 });
+
+  describe('generateHtmlPreview', () => {
+    it('should generate HTML preview for SVG fallback', () => {
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('svg', mockProcessingResult, 'apple-mail');
+      
+      // Check that HTML preview was generated
+      expect(htmlPreview).toBeDefined();
+      expect(htmlPreview).toContain('email-preview');
+      expect(htmlPreview).toContain('email-preview-apple-mail');
+      
+      // Check that HTMLTemplateService was called with SVG content
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          svgContent: mockProcessingResult.optimizedSvg,
+          vmlCode: undefined // VML should be excluded for SVG preview
+        })
+      );
+    });
+    
+    it('should generate HTML preview for VML fallback', () => {
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('vml', mockProcessingResult, 'outlook-desktop');
+      
+      // Check that HTML preview was generated
+      expect(htmlPreview).toBeDefined();
+      expect(htmlPreview).toContain('email-preview');
+      expect(htmlPreview).toContain('email-preview-outlook-desktop');
+      
+      // Check that HTMLTemplateService was called with VML content
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vmlCode: mockProcessingResult.vmlCode,
+          svgContent: undefined // SVG should be excluded for VML preview
+        })
+      );
+    });
+    
+    it('should generate HTML preview for PNG fallback', () => {
+      const htmlPreview = PreviewGeneratorService.generateHtmlPreview('png', mockProcessingResult, 'gmail');
+      
+      // Check that HTML preview was generated
+      expect(htmlPreview).toBeDefined();
+      expect(htmlPreview).toContain('email-preview');
+      expect(htmlPreview).toContain('email-preview-gmail');
+      
+      // Check that HTMLTemplateService was called with PNG content only
+      expect(HTMLTemplateService.generateEmailHtml).toHaveBeenCalledWith(
+        expect.objectContaining({
+          svgContent: undefined,
+          vmlCode: undefined
+        })
+      );
+    });
+  });
+  
+  describe('generateClientSpecificStyles', () => {
+    it('should generate base styles for all clients', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('thunderbird');
+      
+      // Check that base styles are included
+      expect(styles).toContain('.email-preview');
+      expect(styles).toContain('font-family');
+      expect(styles).toContain('background-color');
+    });
+    
+    it('should generate Outlook Desktop specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('outlook-desktop');
+      
+      // Check that Outlook Desktop specific styles are included
+      expect(styles).toContain('.email-preview-outlook-desktop');
+      expect(styles).toContain('Calibri');
+      expect(styles).toContain('border-radius: 0');
+    });
+    
+    it('should generate Gmail specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('gmail');
+      
+      // Check that Gmail specific styles are included
+      expect(styles).toContain('.email-preview-gmail');
+      expect(styles).toContain('Arial');
+      expect(styles).toContain('display: none');
+    });
+    
+    it('should generate Apple Mail specific styles', () => {
+      const styles = PreviewGeneratorService.generateClientSpecificStyles('apple-mail');
+      
+      // Check that Apple Mail specific styles are included
+      expect(styles).toContain('.email-preview-apple-mail');
+      expect(styles).toContain('SF Pro');
+    });
+  });

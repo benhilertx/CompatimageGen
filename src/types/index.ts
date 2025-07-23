@@ -95,6 +95,19 @@ export interface ClientPreview {
   fallbackUsed: FallbackType;
   estimatedQuality: QualityRating;
   previewImage?: Buffer;
+  // New fields for HTML preview
+  htmlPreview?: string;      // HTML content for rendering preview
+  clientStyles?: string;     // Client-specific CSS limitations
+}
+
+// Platform details information
+export interface PlatformDetails {
+  name: string;
+  marketShare: number;
+  supportedFeatures: string[];
+  limitations: string[];
+  bestPractices: string[];
+  renderingNotes: string;
 }
 
 // Package data for ZIP generation
