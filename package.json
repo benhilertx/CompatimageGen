@@ -14,7 +14,6 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@tailwindcss/postcss": "^4.1.11",
     "jszip": "^3.10.1",
     "next": "15.4.2",
     "react": "19.1.0",
