@@ -12,77 +12,68 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { processId: string } }
 ) {
-  try {
-    const { processId } = params;
-    
-    if (!processId) {
-      return NextResponse.json(
-        { 
-          error: 'Missing processId',
-          code: 'missing-processid'
-        },
-        { status: 400 }
-      );
-    }
-    
-    try {
-      // Get status from temporary storage
-      const statusData = await getProcessingStatus(processId);
-      
-      // Get warnings if processing is complete
-      let warnings: Warning[] = [];
-      if (statusData.status === 'complete') {
-        warnings = await getProcessingWarnings(processId);
-      }
-      
-      // Create status response
-      const status: ProcessingStatusInfo = {
-        step: statusData.status === 'complete' ? 'complete' : 
-              statusData.status === 'error' ? 'error' : 
-              statusData.status === 'processing' ? 'optimizing' : 'validating',
-        progress: statusData.progress || 0,
-        message: statusData.message || getDefaultMessage(statusData.status),
-        error: statusData.error
-      };
-      
-      return NextResponse.json({
-        status,
-        warnings,
-        processId
-      });
-    } catch (error) {
-      console.error('Status retrieval error:', error);
-      
-      // Check if file not found
-      if (error instanceof Error && error.message.includes('ENOENT')) {
-        return NextResponse.json(
-          { 
-            error: 'Process not found',
-            code: 'process-not-found',
-            details: error.message
-          },
-          { status: 404 }
-        );
-      }
-      
-      return NextResponse.json(
-        { 
-          error: 'Failed to retrieve status',
-          code: 'status-retrieval-failed',
-          details: error instanceof Error ? error.message : 'Unknown error'
-        },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
-    console.error('Request error:', error);
+  // Extract processId from the URL instead of params
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const processId = pathParts[pathParts.length - 1];
+  
+  if (!processId) {
     return NextResponse.json(
       { 
-        error: 'Invalid request',
-        code: 'invalid-request',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Missing processId',
+        code: 'missing-processid'
       },
       { status: 400 }
+    );
+  }
+  
+  try {
+    // Get status from temporary storage
+    const statusData = await getProcessingStatus(processId);
+    
+    // Get warnings if processing is complete
+    let warnings: Warning[] = [];
+    if (statusData.status === 'complete') {
+      warnings = await getProcessingWarnings(processId);
+    }
+    
+    // Create status response
+    const status: ProcessingStatusInfo = {
+      step: statusData.status === 'complete' ? 'complete' : 
+            statusData.status === 'error' ? 'error' : 
+            statusData.status === 'processing' ? 'optimizing' : 'validating',
+      progress: statusData.progress || 0,
+      message: statusData.message || getDefaultMessage(statusData.status),
+      error: statusData.error
+    };
+    
+    return NextResponse.json({
+      status,
+      warnings,
+      processId
+    });
+  } catch (error) {
+    console.error('Status retrieval error:', error);
+    
+    // Check if file not found
+    if (error instanceof Error && error.message.includes('ENOENT')) {
+      return NextResponse.json(
+        { 
+          error: 'Process not found',
+          code: 'process-not-found',
+          details: error.message
+        },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json(
+      { 
+        error: 'Failed to retrieve status',
+        code: 'status-retrieval-failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
     );
   }
 }

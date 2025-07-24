@@ -13,7 +13,21 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { fileId: string } }
 ) {
-  const { fileId } = params;
+  // Extract fileId from the URL instead of params
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const fileId = pathParts[pathParts.length - 1];
+  
+  if (!fileId) {
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: 'Missing fileId',
+        code: 'missing-fileid'
+      },
+      { status: 400 }
+    );
+  }
   
   try {
     // Use system temp directory or configured directory
@@ -65,7 +79,21 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { fileId: string } }
 ) {
-  const { fileId } = params;
+  // Extract fileId from the URL instead of params
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const fileId = pathParts[pathParts.length - 1];
+  
+  if (!fileId) {
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: 'Missing fileId',
+        code: 'missing-fileid'
+      },
+      { status: 400 }
+    );
+  }
   
   try {
     // Use system temp directory or configured directory

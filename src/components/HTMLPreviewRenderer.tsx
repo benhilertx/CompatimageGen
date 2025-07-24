@@ -57,8 +57,14 @@ const HTMLPreviewRenderer: React.FC<HTMLPreviewRendererProps> = ({
       box-sizing: border-box;
       overflow: hidden;
     }
+    /* Prevent loading external resources */
+    img[src^="http"], img[src^="//"] {
+      display: none;
+    }
     ${clientStyles}
   </style>
+  <!-- Prevent loading external resources -->
+  <base href="about:blank">
 </head>
 <body>
   <div class="email-preview-container">
@@ -72,37 +78,54 @@ const HTMLPreviewRenderer: React.FC<HTMLPreviewRendererProps> = ({
     const iframe = iframeRef.current;
     if (!iframe) return;
 
+    // Create a flag to track if the component is still mounted
+    let isMounted = true;
+    
+    // Create a one-time load handler
+    const handleLoad = () => {
+      if (isMounted) {
+        setIsLoaded(true);
+        setHasError(false);
+        if (onLoad) onLoad();
+      }
+    };
+    
     try {
       // Set up iframe content
       const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
       
       if (iframeDocument) {
+        // Add load handler before writing content
+        iframe.onload = handleLoad;
+        
         // Write the HTML content to the iframe
         iframeDocument.open();
         iframeDocument.write(getFullHtmlDocument());
         iframeDocument.close();
         
-        // Handle iframe load event
-        const handleLoad = () => {
-          setIsLoaded(true);
-          setHasError(false);
-          if (onLoad) onLoad();
-        };
-        
-        iframe.onload = handleLoad;
-        
         // If the iframe is already loaded (happens in some browsers)
         if (iframeDocument.readyState === 'complete') {
-          handleLoad();
+          // Use setTimeout to avoid potential infinite loops
+          setTimeout(handleLoad, 0);
         }
       }
     } catch (error) {
       console.error('Error rendering HTML preview:', error);
-      setHasError(true);
-      setIsLoaded(false);
-      if (onError) onError(error instanceof Error ? error : new Error(String(error)));
+      if (isMounted) {
+        setHasError(true);
+        setIsLoaded(false);
+        if (onError) onError(error instanceof Error ? error : new Error(String(error)));
+      }
     }
-  }, [htmlContent, clientStyles, clientId, onLoad, onError]);
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+      if (iframe) {
+        iframe.onload = null;
+      }
+    };
+  }, [htmlContent, clientStyles, clientId, title, onLoad, onError]);
 
   return (
     <div 
@@ -199,10 +222,6 @@ const HTMLPreviewRenderer: React.FC<HTMLPreviewRendererProps> = ({
           opacity: isLoaded && !hasError ? 1 : 0,
         }}
         aria-label={`${title} for ${clientId}`}
-        onLoad={() => {
-          setIsLoaded(true);
-          if (onLoad) onLoad();
-        }}
       />
     </div>
   );

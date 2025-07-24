@@ -12,101 +12,84 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { processId: string } }
 ) {
+  // Extract processId from the URL
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const processId = pathParts[pathParts.length - 1];
+  
+  if (!processId) {
+    return NextResponse.json(
+      { 
+        error: 'Missing processId',
+        code: 'missing-processid'
+      },
+      { status: 400 }
+    );
+  }
+  
   try {
-    const { processId } = params;
+    // Check if processing is complete
+    const statusData = await getProcessingStatus(processId);
     
-    if (!processId) {
+    if (statusData.status !== 'complete') {
       return NextResponse.json(
         { 
-          error: 'Missing processId',
-          code: 'missing-processid'
+          error: 'Processing not complete',
+          code: 'processing-incomplete',
+          status: statusData.status
         },
         { status: 400 }
       );
     }
     
-    try {
-      // Check if processing is complete
-      const statusData = await getProcessingStatus(processId);
-      
-      if (statusData.status !== 'complete') {
-        return NextResponse.json(
-          { 
-            error: 'Processing not complete',
-            code: 'processing-incomplete',
-            status: statusData.status
-          },
-          { status: 400 }
-        );
-      }
-      
-      // Get HTML code
-      const htmlCode = await getHtmlCode(processId);
-      
-      // Get metadata
-      const metadata = await getMetadata(processId);
-      
-      // Generate previews
-      const previews = generatePreviews(metadata);
-      
-      // Generate text previews
-      const textPreviews = generateTextPreviews(previews);
-      
-      return NextResponse.json({
-        htmlCode,
-        previews,
-        textPreviews,
-        metadata: metadata.metadata
-      });
-    } catch (error) {
-      console.error('Preview retrieval error:', error);
-      
-      // Check if file not found
-      if (error instanceof Error && error.message.includes('ENOENT')) {
-        return NextResponse.json(
-          { 
-            error: 'Process not found',
-            code: 'process-not-found',
-            details: error.message
-          },
-          { status: 404 }
-        );
-      }
-      
+    // Get HTML code
+    const htmlCode = await getHtmlCode(processId);
+    
+    // Get metadata
+    const metadata = await getMetadata(processId);
+    
+    // Generate simple previews
+    const previews = generateSimplePreviews();
+    
+    // Generate text previews
+    const textPreviews = generateTextPreviews(previews);
+    
+    return NextResponse.json({
+      htmlCode,
+      previews,
+      textPreviews,
+      metadata: metadata.metadata
+    });
+  } catch (error) {
+    console.error('Preview retrieval error:', error);
+    
+    // Check if file not found
+    if (error instanceof Error && error.message.includes('ENOENT')) {
       return NextResponse.json(
         { 
-          error: 'Failed to retrieve preview data',
-          code: 'preview-retrieval-failed',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          error: 'Process not found',
+          code: 'process-not-found',
+          details: error.message
         },
-        { status: 500 }
+        { status: 404 }
       );
     }
-  } catch (error) {
-    console.error('Request error:', error);
+    
     return NextResponse.json(
       { 
-        error: 'Invalid request',
-        code: 'invalid-request',
+        error: 'Failed to retrieve preview data',
+        code: 'preview-retrieval-failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
 
 /**
  * Get processing status from temporary storage
- * @param processId Unique identifier for the process
- * @returns Processing status
  */
-async function getProcessingStatus(processId: string): Promise<{
-  status: 'pending' | 'processing' | 'complete' | 'error';
-  progress: number;
-  message?: string;
-  error?: string;
-  updatedAt: string;
-}> {
+async function getProcessingStatus(processId: string) {
   // Use system temp directory or configured directory
   const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
   
@@ -134,10 +117,8 @@ async function getProcessingStatus(processId: string): Promise<{
 
 /**
  * Get HTML code from temporary storage
- * @param processId Unique identifier for the process
- * @returns HTML code
  */
-async function getHtmlCode(processId: string): Promise<string> {
+async function getHtmlCode(processId: string) {
   // Use system temp directory or configured directory
   const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
   
@@ -150,10 +131,8 @@ async function getHtmlCode(processId: string): Promise<string> {
 
 /**
  * Get metadata from temporary storage
- * @param processId Unique identifier for the process
- * @returns Metadata
  */
-async function getMetadata(processId: string): Promise<any> {
+async function getMetadata(processId: string) {
   // Use system temp directory or configured directory
   const tempDir = APP_CONFIG.process.tempDir || path.join(os.tmpdir(), 'compatimage-results');
   
@@ -166,86 +145,53 @@ async function getMetadata(processId: string): Promise<any> {
 }
 
 /**
- * Generate previews for email clients
- * @param metadata Processing metadata
- * @returns Array of client previews
+ * Generate simple previews for email clients
  */
-function generatePreviews(metadata: any): ClientPreview[] {
-  // Get file types available
-  const hasSvg = !!metadata.originalFile.type === 'svg';
-  const hasVml = !!metadata.vmlCode;
-  
+function generateSimplePreviews() {
   // Generate previews for each client
   return EMAIL_CLIENTS.slice(0, 3).map(client => {
-    // Determine fallback type
-    let fallbackUsed = client.preferredFallback;
+    // Create simple HTML preview
+    const htmlPreview = `
+      <div style="border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
+        <div style="background-color: #f5f5f5; padding: 8px; border-bottom: 1px solid #ddd;">
+          ${client.name}
+        </div>
+        <div style="padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 100px;">
+          <div style="width: 200px; height: 100px; background-color: #3498db; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; border-radius: 4px;">
+            ${client.preferredFallback.toUpperCase()} Preview
+          </div>
+        </div>
+      </div>
+    `;
     
-    // If preferred fallback is not available, use PNG
-    if (fallbackUsed === 'svg' && !hasSvg) {
-      fallbackUsed = 'png';
-    } else if (fallbackUsed === 'vml' && !hasVml) {
-      fallbackUsed = 'png';
-    }
-    
-    // Determine quality rating
-    let estimatedQuality = 'excellent';
-    if (fallbackUsed !== client.preferredFallback) {
-      estimatedQuality = 'good';
-    }
-    
-    // If using PNG for a client that prefers SVG or VML, quality is good
-    if (fallbackUsed === 'png' && client.preferredFallback !== 'png') {
-      estimatedQuality = 'good';
-    }
+    // Create simple CSS
+    const clientStyles = `
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+    `;
     
     // Return preview
     return {
       client: client.id,
-      fallbackUsed,
-      estimatedQuality,
-    } as ClientPreview;
+      fallbackUsed: client.preferredFallback,
+      estimatedQuality: 'good',
+      htmlPreview,
+      clientStyles
+    };
   });
 }
 
 /**
  * Generate text previews for email clients
- * @param previews Client previews
- * @returns Array of text previews
  */
-function generateTextPreviews(previews: ClientPreview[]): string[] {
+function generateTextPreviews(previews) {
   return previews.map(preview => {
     const client = EMAIL_CLIENTS.find(c => c.id === preview.client);
     if (!client) return '';
     
-    let qualityText = '';
-    switch (preview.estimatedQuality) {
-      case 'excellent':
-        qualityText = 'excellent quality';
-        break;
-      case 'good':
-        qualityText = 'good quality';
-        break;
-      case 'fair':
-        qualityText = 'fair quality';
-        break;
-      case 'poor':
-        qualityText = 'reduced quality';
-        break;
-    }
-    
-    let fallbackText = '';
-    switch (preview.fallbackUsed) {
-      case 'svg':
-        fallbackText = 'SVG vector format';
-        break;
-      case 'png':
-        fallbackText = 'PNG raster format';
-        break;
-      case 'vml':
-        fallbackText = 'VML vector format';
-        break;
-    }
-    
-    return `${client.name} (${client.marketShare}% market share): Will use ${fallbackText} with ${qualityText}`;
+    return `${client.name} (${client.marketShare}% market share): Will use ${preview.fallbackUsed} format with ${preview.estimatedQuality} quality`;
   });
 }

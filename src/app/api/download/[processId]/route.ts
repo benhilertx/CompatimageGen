@@ -20,81 +20,72 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { processId: string } }
 ) {
+  // Extract processId from the URL instead of params
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const processId = pathParts[pathParts.length - 1];
+  
+  if (!processId) {
+    return NextResponse.json(
+      { 
+        error: 'Missing processId',
+        code: 'missing-processid'
+      },
+      { status: 400 }
+    );
+  }
+  
   try {
-    const { processId } = params;
+    // Check if processing is complete
+    const statusData = await getProcessingStatus(processId);
     
-    if (!processId) {
+    if (statusData.status !== 'complete') {
       return NextResponse.json(
         { 
-          error: 'Missing processId',
-          code: 'missing-processid'
+          error: 'Processing not complete',
+          code: 'processing-incomplete',
+          status: statusData.status
         },
         { status: 400 }
       );
     }
     
-    try {
-      // Check if processing is complete
-      const statusData = await getProcessingStatus(processId);
-      
-      if (statusData.status !== 'complete') {
-        return NextResponse.json(
-          { 
-            error: 'Processing not complete',
-            code: 'processing-incomplete',
-            status: statusData.status
-          },
-          { status: 400 }
-        );
-      }
-      
-      // Get metadata
-      const metadata = await getMetadata(processId);
-      
-      // Create ZIP package
-      const zipBuffer = await createZipPackage(processId, metadata);
-      
-      // Return ZIP file
-      return new NextResponse(zipBuffer, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/zip',
-          'Content-Disposition': `attachment; filename="email-logo-package.zip"`,
-        },
-      });
-    } catch (error) {
-      console.error('Download error:', error);
-      
-      // Check if file not found
-      if (error instanceof Error && error.message.includes('ENOENT')) {
-        return NextResponse.json(
-          { 
-            error: 'Process not found',
-            code: 'process-not-found',
-            details: error.message
-          },
-          { status: 404 }
-        );
-      }
-      
+    // Get metadata
+    const metadata = await getMetadata(processId);
+    
+    // Create ZIP package
+    const zipBuffer = await createZipPackage(processId, metadata);
+    
+    // Return ZIP file
+    return new NextResponse(zipBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="email-logo-package.zip"`,
+      },
+    });
+  } catch (error) {
+    console.error('Download error:', error);
+    
+    // Check if file not found
+    if (error instanceof Error && error.message.includes('ENOENT')) {
       return NextResponse.json(
         { 
-          error: 'Failed to generate download package',
-          code: 'download-generation-failed',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          error: 'Process not found',
+          code: 'process-not-found',
+          details: error.message
         },
-        { status: 500 }
+        { status: 404 }
       );
     }
-  } catch (error) {
-    console.error('Request error:', error);
+    
     return NextResponse.json(
       { 
-        error: 'Invalid request',
-        code: 'invalid-request',
+        error: 'Failed to generate download package',
+        code: 'download-generation-failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
